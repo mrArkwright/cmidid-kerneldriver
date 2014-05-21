@@ -15,10 +15,9 @@ struct snd_card_virmidi {
          struct snd_rawmidi *midi[1];
 };
 
-static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;      /* Index 0-MAX */
-static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR; 
-
-
+void mylog(char *msg) {
+	printk("hello_midi: %s\n", msg);
+}
 
 int hellomidi_probe(struct platform_device *devptr) {
 	struct snd_card *card;
@@ -26,9 +25,14 @@ int hellomidi_probe(struct platform_device *devptr) {
 	int err;
 	struct snd_rawmidi *rmidi;
 
-	err = snd_card_create(index[dev], id[dev], THIS_MODULE, sizeof(struct snd_card_virmidi), &card);
+	mylog("probe called");
+
+	if ((err = snd_card_create(-1, NULL, THIS_MODULE, sizeof(struct snd_card_virmidi), &card)) < 0) {
+		mylog("error creating card");
+		return err;
+	}
 	
-	printk("creating card %i\n",err);
+	mylog("card created");
 	
 	snd_virmidi_new(card, 0, &rmidi);
 	strcpy(rmidi->name, "hello midi");
@@ -37,16 +41,23 @@ int hellomidi_probe(struct platform_device *devptr) {
 	strcpy(card->shortname, "helloMIDI");
 	sprintf(card->longname, "hello MIDI Card %i", dev + 1);
 
-	err=  snd_card_register(card);
+	if ((err = snd_card_register(card)) < 0) {
+		mylog("error registering card");
+		return err;
+	}
+
+	platform_set_drvdata(devptr, card);
 	
-	printk("register card %i\n",err);
+	mylog("card registered");
 	
 	return 0;
 }
 
-static struct platform_device *devices[SNDRV_CARDS];
+static struct platform_device *device;
 
 int hellomidi_remove(struct platform_device *devptr) {
+	mylog("remove called");
+
 	snd_card_free(platform_get_drvdata(devptr));
 	return 0;
 }
@@ -61,42 +72,25 @@ static struct platform_driver hellomidi_driver = {
  };
 
 
-int init_module(void) {
-	//int i,cards;
-	
-	printk("init called\n");
-	platform_driver_register(&hellomidi_driver);
-	
-	/*cards=0;
-	for (i = 0; i < SNDRV_CARDS; i++) {
-		*/
-		struct platform_device *device;
-		/*if (! i==3)
-			continue;
-		*/
-		device = platform_device_register_simple("hello-midi",
-							 3, NULL, 0);
-		printk("reged dev");
-		/*if (IS_ERR(device))
-			continue;
-		if (!platform_get_drvdata(device)) {
-			platform_device_unregister(device);
-			continue;
-		}
-		printk("reged ready");
-		*/devices[3] = device;
-	/*	cards++;
-	}
-	if (!cards) {
-             printk(KERN_ERR "Card-VirMIDI soundcard not found or device busy\n");
+int __init hello_midi_init(void) {
+	mylog("init called");
 
-	}*/	
+	platform_driver_register(&hellomidi_driver);
+	device = platform_device_register_simple("hello-midi", 0, NULL, 0);
+
+	mylog("device registered");
+
 	return 0;
 }
 
-void cleanup_module(void) {
+void __exit hello_midi_exit(void) {
+	mylog("exit called");
+
+	platform_device_unregister(device);
 	platform_driver_unregister(&hellomidi_driver);
-	printk("cleanup_module called\n");
 }
+
+module_init(hello_midi_init)
+module_exit(hello_midi_exit)
 
 MODULE_LICENSE("GPL");
