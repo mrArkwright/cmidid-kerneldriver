@@ -1,0 +1,46 @@
+\documentclass{beamer}
+
+\usepackage[english]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{fancyvrb}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usetikzlibrary{decorations.pathreplacing,decorations.pathmorphing,patterns}
+\usepackage{units}
+\usepackage{pgfplots}
+\usepackage{verbatim}
+\usepackage{listings}
+\usepackage{bbding}
+
+\definecolor{gruen}{rgb}{0,0.45,0}
+\definecolor{rot}{rgb}{0.9,0,0}
+
+\newcommand{\gitem}{\item[\textcolor{gruen}{{\small \Checkmark}}]}
+\newcommand{\bitem}{\item[\textcolor{rot}{{\small \XSolidBrush}}]}
+
+%\SetTracking{encoding=*}{-60}\lsstyle\fontsize{9}{9.2}
+\lstset{basicstyle=\selectfont\ttfamily}
+\lstset{language=C,tabsize=4,numbers=left,numberstyle=\tiny\color{gray}}
+\lstset{commentstyle=\color{gray}}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamercovered{invisible}
+%\addtobeamertemplate{background canvas}{\transfade[duration=0.2]}{}
+
+%Anfang zur Titelseite
+\title{custom MIDI device driver}
+\author{Andreas Ruhland, Felix Engelmann,\\ Jannik Theiß, Michael Opitz}
+
+\logo{\includegraphics[height=1cm]{tum.pdf}\hspace{2mm}}
+
+%Anfang der Folien
+\begin{document}
+\frame[plain]{\titlepage}
+
+\input{felix}
+\end{document}
