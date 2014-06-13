@@ -41,3 +41,46 @@
     \node[text width=4cm, align=center, rotate=270] at (2.2, -0.2) {MIDI\qquad Events};
   \end{tikzpicture}
 \end{frame}
+
+\begin{frame}
+	\frametitle{ALSA}
+	\centering
+  	\begin{tikzpicture}
+		\node at(0,0) {\includegraphics[width=6cm]{img/alsa.png}};
+		\pause
+		\draw[ultra thick, color= pink] (2.9, -2.1) rectangle (0.9,-0.7);
+	\end{tikzpicture}
+\end{frame}
+
+\begin{frame}[fragile]
+	\frametitle{ALSA sequencer connection manager}
+Input devices (\texttt{aconnect -i}):
+  	\begin{lstlisting}
+client 20: 'cmidid-client' [type=kernel] 
+    0 'cmididpinfo    
+	\end{lstlisting}
+Output devices (\texttt{aconnect -o}):
+  	\begin{lstlisting}
+client 128: 'FLUID Synth (2274)' [type=user]
+    0 'Synth input port (2274:0)'
+\end{lstlisting}
+$ $
+\\
+Connect both ports with \texttt{aconnect 20:0 128:00}
+
+
+
+\end{frame}
+
+\begin{frame}
+	\frametitle{Why Kernel Module?}
+\begin{tikzpicture}
+	\node at (-6cm,0) {\includegraphics[width=5cm]{img/cheetah.png}};
+	\node[text width=7cm] at(-2,-3) {
+	\begin{itemize} 
+		\item precise timers (1 ns resolution) 
+		\item usage of interrupts $\Rightarrow$ short delay
+		\item relativley small overhead 
+	\end{itemize}};
+\end{tikzpicture}
+\end{frame} 
