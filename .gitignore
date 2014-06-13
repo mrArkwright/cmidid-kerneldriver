@@ -12,6 +12,7 @@
 **/Module.symvers
 **/.tmp_versions
 
+presentation/*.orig
 presentation/*.aux
 presentation/*.nav
 presentation/*.toc
@@ -20,3 +21,5 @@ presentation/*.vrb
 presentation/*.out
 presentation/*.log
 presentation/presentation.pdf
+
+
