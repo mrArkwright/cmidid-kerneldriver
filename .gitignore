@@ -11,3 +11,12 @@
 **/modules.order
 **/Module.symvers
 **/.tmp_versions
+
+presentation/*.aux
+presentation/*.nav
+presentation/*.toc
+presentation/*.snm
+presentation/*.vrb
+presentation/*.out
+presentation/*.log
+presentation/presentation.pdf
