@@ -1,3 +1,9 @@
 \begin{frame}
-  \frametitle{Hi there}
+    \centering
+    \begin{tikzpicture}
+      \node at (0,0) {\includegraphics[width=3cm]{img/raspi.jpg}};
+      \path[snake=expanding waves,segment length=2mm,segment angle=30,draw,thick,color=blue] (-1.3,0.85) -- +(-2,0);
+      \draw[ultra thick] plot [smooth,tension=1.5] coordinates{(-1,-1) (-4,-1.5) (-4,-3)};
+      \node at (-4.5, -3) {\includegraphics[width=5cm]{img/Musical_keyboard.png}};
+    \end{tikzpicture}
 \end{frame}
