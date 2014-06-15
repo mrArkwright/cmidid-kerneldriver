@@ -1,10 +1,11 @@
 \begin{frame}
     \centering
     \begin{tikzpicture}
+		\path[use as bounding box] (-6,0) -- (2,0);
       \node at (0,0) {\includegraphics[width=3cm]{img/raspi.jpg}};
       \path[snake=expanding waves,segment length=2mm,segment angle=30,draw,thick,color=blue] (-1.3,0.85) -- +(-2,0);
       %\draw[ultra thick] plot [smooth,tension=1.5] coordinates{(-1,-1) (-2.2, -1.6) (-4, -1.2) (-4.5, -3)};
-	  \draw[ultra thick] (-1,-1) .. controls(-1.5,-3) and (-4,0) .. (-4.5,-3);
+	  \draw[ultra thick] (-0.95,-1.1) .. controls(-1.5,-3) and (-4,0) .. (-4.5,-3);
       \node at (-4.5, -3) {\includegraphics[width=5cm]{img/Musical_keyboard.png}};
     \end{tikzpicture}
 \end{frame}
@@ -68,12 +69,16 @@
 		\draw[line width=1em] (-6.3,-2.3) -- +(0,0.3);
 		\draw[line width=1em] (-0.8,-3.3) -- +(0,1.3);
 		
+		\pause
+		
 		\draw[dashed] (0,-2.3) -- +(-7,0);
 		\draw[dashed] (0,-3.3) -- +(-7,0);
 		
-		\pause
 		
 		\draw[|<->|] (0,-2.3) -- node[right]{$\Delta t$} +(0,-1);
+		
+		\node[left] at (-7,-2.3){B};
+		\node[left] at (-7,-3.3){A};
 		
 		\node at (-3.5,-4.5) {$\text{midi\_velocity}=\frac{\text{idle\_stroke}}{\text{Time B - Time A}}$};
 	\end{tikzpicture}
@@ -113,7 +118,8 @@
   	\begin{tikzpicture}
 		\node at(0,0) {\includegraphics[width=6cm]{img/alsa.png}};
 		\pause
-		\draw[ultra thick, color= pink] (2.9, -2.1) rectangle (0.9,-0.7);
+		\fill[opacity=0.7,fill=white] (-4,-4) -- (-4,4) -- (4,4) -- (4,-0.7) -- (0.95,-0.7) -- (0.95,-2.08) -- (2.92,-2.08) -- (2.92,-0.7) -- (4,-0.7) -- (4,-4) -- cycle;
+		%\draw[ultra thick, color= pink] (2.9, -2.1) rectangle (0.9,-0.7);
 	\end{tikzpicture}
 \end{frame}
 
@@ -140,7 +146,8 @@ Connect both ports with \texttt{aconnect 20:0 128:00}
 \begin{frame}
 	\frametitle{Why Kernel Module?}
 \begin{tikzpicture}
-	\node at (-6cm,0) {\includegraphics[width=5cm]{img/cheetah.png}};
+	\path[use as bounding box] (-8,2) rectangle (-3,-6);
+	\node at (-6.7cm,0) {\includegraphics[width=8cm]{img/cheetah.png}};
 	\node[text width=7cm] at(-2,-3) {
 	\begin{itemize} 
 		\item precise timers (1 ns resolution) 
