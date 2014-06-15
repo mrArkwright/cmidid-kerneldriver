@@ -1,7 +1,8 @@
+
 #include <linux/module.h>
 #include <linux/ip.h>
 #include <linux/inet.h>
-#include <linux/ktime.h>
+#include <linux/time.h>
 #include <net/sock.h>
 
 #define SERVERPORT 5008
@@ -16,6 +17,7 @@ struct applemidi_session {
 
 	u64 latency, difference;
 
+	int seq;
 	bool control;
 	bool data;
 };
@@ -71,7 +73,7 @@ static int session_init(u32 saddr, u16 port, u32 token)
 	printk(KERN_ERR " vor send\n");
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	if (port % 2 == 0) {
+	if (port == sess.port) {
 		len = sock_sendmsg(controlsocket, &msg, 23);
 	} else {
 		len = sock_sendmsg(datasocket, &msg, 23);
@@ -99,21 +101,92 @@ static int session_end(void)
 static void session_sync(u32 saddr, u16 port, char *data)
 {
 	u8 *count;
-	ktime_t nsnow;
-	u64 now;
 
-	int tmp;
+	struct timeval tv;
+
+	u32 timestamp1;
+
+	int now;
 
 	count = (u8 *) data;
-	nsnow = ktime_get();
+	timestamp1 = ntohl((u32 *) (data + 16));
+
+	do_gettimeofday(&tv);
 
 	//10khz sampling
-	tmp = nsnow.tv64 >> 16 & 0xffffffff;
-	now = tmp / 1.52587;
 
-	printk("time is %ld\n", now);
+	now = tv.tv_sec * 10000 + tv.tv_usec / 100;
+
+	printk("time is %d\n", now);
 	if (*count == 0) {
 		printk("we have to respond to sync\n");
+
+		int len;
+		char buf[100];
+		struct msghdr msg;
+		struct iovec iov;
+		mm_segment_t oldfs;
+		struct sockaddr_in to;
+
+		memset(&to, 0, sizeof(to));
+		to.sin_family = AF_INET;
+		to.sin_addr.s_addr = htonl(sess.addr);	/* destination address */
+		to.sin_port = htons(sess.port + 1);
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_name = &to;
+		msg.msg_namelen = sizeof(to);
+		memset(&buf, 0, sizeof(buf));
+		*(u16 *) (buf) = htons(0xffff);
+		*(u16 *) (buf + 2) = htons(0x434b);
+		*(u32 *) (buf + 4) = htonl(ssrc);
+		*(u8 *) (buf + 8) = (u8) (1);
+		//*(u64 *) (buf + 12) = htonl(timestamp1);
+		memcpy(buf + 12, data + 12, 8);
+		*(u64 *) (buf + 24) = htonl(now);
+		*(u64 *) (buf + 32) = htonl(now);
+		iov.iov_base = buf;
+		iov.iov_len = 36;
+		msg.msg_control = NULL;
+		msg.msg_controllen = 0;
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		// msg.msg_flags    = MSG_NOSIGNAL;
+		printk(KERN_ERR " vor send\n");
+		oldfs = get_fs();
+		set_fs(KERNEL_DS);
+		len = sock_sendmsg(datasocket, &msg, 36);
+		set_fs(oldfs);
+		printk(KERN_ERR "sock_sendmsg returned: %d\n", len);
+
+		memset(&to, 0, sizeof(to));
+		to.sin_family = AF_INET;
+		to.sin_addr.s_addr = htonl(sess.addr);	/* destination address */
+		to.sin_port = htons(sess.port + 1);
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_name = &to;
+		msg.msg_namelen = sizeof(to);
+		memset(&buf, 0, sizeof(buf));
+		*(u16 *) (buf) = htons(0x8061);
+		*(u16 *) (buf + 2) = htons(sess.seq);
+		sess.seq++;
+		*(u32 *) (buf + 4) = htonl(now);
+		*(u32 *) (buf + 8) = htonl(ssrc);
+		*(u8 *) (buf + 12) = (u8) (0x04);
+		*(u32 *) (buf + 13) = htonl(0x99496400);
+		iov.iov_base = buf;
+		iov.iov_len = 17;
+		msg.msg_control = NULL;
+		msg.msg_controllen = 0;
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+		// msg.msg_flags    = MSG_NOSIGNAL;
+		printk(KERN_ERR " vor send\n");
+		oldfs = get_fs();
+		set_fs(KERNEL_DS);
+		len = sock_sendmsg(datasocket, &msg, 17);
+		set_fs(oldfs);
+		printk(KERN_ERR "sock_sendmsg returned: %d\n", len);
+
 	}
 	return;
 }
@@ -244,6 +317,7 @@ static int __init mod_init(void)
 	sess.data = false;
 	sess.latency = 0;
 	sess.difference = 0;
+	sess.seq = 4200;
 
 	return 0;
 
