@@ -100,6 +100,13 @@ static int session_end(void)
 
 static void session_sync(u32 saddr, u16 port, char *data)
 {
+	int i;
+	printk("sync packet: ");
+	for (i=0; i < 22; i++) {
+		u8 *p = (u8 *) data + i;
+		printk("%x ", *p);
+	}
+	
 	u8 *count;
 
 	struct timeval tv;
@@ -109,7 +116,7 @@ static void session_sync(u32 saddr, u16 port, char *data)
 	int now;
 
 	count = (u8 *) data;
-	timestamp1 = ntohl((u32 *) (data + 16));
+	timestamp1 = *((u32 *) (data + 8));
 
 	do_gettimeofday(&tv);
 
@@ -117,7 +124,8 @@ static void session_sync(u32 saddr, u16 port, char *data)
 
 	now = tv.tv_sec * 10000 + tv.tv_usec / 100;
 
-	printk("time is %d\n", now);
+	printk("\ntime is %x\n", now);
+	printk("time1 is %x\n", timestamp1);
 	if (*count == 0) {
 		printk("we have to respond to sync\n");
 
@@ -140,8 +148,8 @@ static void session_sync(u32 saddr, u16 port, char *data)
 		*(u16 *) (buf + 2) = htons(0x434b);
 		*(u32 *) (buf + 4) = htonl(ssrc);
 		*(u8 *) (buf + 8) = (u8) (1);
-		//*(u64 *) (buf + 12) = htonl(timestamp1);
-		memcpy(buf + 12, data + 12, 8);
+		*(u32 *) (buf + 16) = timestamp1;
+		//memcpy(buf + 12, data + 12, 8);
 		*(u64 *) (buf + 24) = htonl(now);
 		*(u64 *) (buf + 32) = htonl(now);
 		iov.iov_base = buf;
@@ -160,7 +168,7 @@ static void session_sync(u32 saddr, u16 port, char *data)
 
 		memset(&to, 0, sizeof(to));
 		to.sin_family = AF_INET;
-		to.sin_addr.s_addr = htonl(sess.addr);	/* destination address */
+		to.sin_addr.s_addr = htonl(sess.addr);	// destination address 
 		to.sin_port = htons(sess.port + 1);
 		memset(&msg, 0, sizeof(msg));
 		msg.msg_name = &to;
@@ -169,7 +177,7 @@ static void session_sync(u32 saddr, u16 port, char *data)
 		*(u16 *) (buf) = htons(0x8061);
 		*(u16 *) (buf + 2) = htons(sess.seq);
 		sess.seq++;
-		*(u32 *) (buf + 4) = htonl(now);
+		*(u32 *) (buf + 4) = htonl(now+500);
 		*(u32 *) (buf + 8) = htonl(ssrc);
 		*(u8 *) (buf + 12) = (u8) (0x04);
 		*(u32 *) (buf + 13) = htonl(0x99496400);
@@ -186,7 +194,7 @@ static void session_sync(u32 saddr, u16 port, char *data)
 		len = sock_sendmsg(datasocket, &msg, 17);
 		set_fs(oldfs);
 		printk(KERN_ERR "sock_sendmsg returned: %d\n", len);
-
+		
 	}
 	return;
 }
