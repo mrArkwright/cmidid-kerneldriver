@@ -9,15 +9,16 @@
 static struct socket *controlsocket = NULL;
 static struct socket *datasocket = NULL;
 
-u32 ssrc;
-
 struct applemidi_session {
 	__be32 addr;
 	u16 port;
-
+	
+	u32 ssrc;
+	
 	u64 latency, difference;
 
 	int seq;
+	
 	bool control;
 	bool data;
 };
@@ -25,13 +26,72 @@ struct applemidi_session {
 struct applemidi_session sess;
 
 struct applemidi_packet {
-	u16 signature;
 	u16 command;
-	u32 version;
-	u32 token;
 	u32 ssrc;
-	char name[40];
-};
+	union {
+		struct control{
+			u32 version;
+			u32 token;		
+			char name[40];
+		} control;
+		struct synchronisation{
+			u8 count;
+			u64 timestamp1;
+			u64 timestamp2;
+			u64 timestamp3;
+		} synchronisation;
+		struct feedback{
+			u32 sequence;
+		} feedback;
+	}
+}
+
+int send_buffer(bool control,char *buf,int len)
+{
+	int sent;
+	struct msghdr msg;
+	struct iovec iov;
+	mm_segment_t oldfs;
+	struct sockaddr_in to;
+
+	memset(&to, 0, sizeof(to));
+	to.sin_family = AF_INET;
+	to.sin_addr.s_addr = htonl(sess.saddr);	/* destination address */
+	if(control)
+	{
+		to.sin_port = htons(sess.port);
+	}
+	else
+	{
+		to.sin_port = htons(sess.port+1);
+	}
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_name = &to;
+	msg.msg_namelen = sizeof(to);
+	iov.iov_base = buf;
+	iov.iov_len = len;
+	msg.msg_control = NULL;
+	msg.msg_controllen = 0;
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	if (control) {
+		sent = sock_sendmsg(controlsocket, &msg, len);
+	} else {
+		sent = sock_sendmsg(datasocket, &msg, len);
+	}
+	set_fs(oldfs);
+
+	if (sent != len)		// sent not successful
+	{
+		return(-sent);
+	}
+	return 0;
+}
+
+
 
 static int session_init(u32 saddr, u16 port, u32 token)
 {
@@ -199,8 +259,49 @@ static void session_sync(u32 saddr, u16 port, char *data)
 	return;
 }
 
-static void callback(struct sock *sk, int bytes)
+#define APPLEMIDI_CMD_INVITATION 0x494e 	//IN
+#define APPLEMIDI_CMD_ACCEPT 0x4f4b 		//OK
+#define APPLEMIDI_CMD_SYNC 0x434b  			//CK
+#define APPLEMIDI_CMD_END 0x4259			//BY
+
+int dissect(char * data, int len, struct applemidi_packet *p)
 {
+	if(len < 4)
+		{return -1;}
+	if(*(u16)(data)!=0xffff) //mandatory signature
+		{return -1;}
+	p->command=ntohs(*(u16 *)(data+2));
+	switch(p->command)
+	{
+		case APPLEMIDI_CMD_END:
+			if(len!=16)
+				{return -1;}
+		case APPLEMIDI_CMD_INVITATION:
+			if(len < 16)
+				{return -1;}
+			p->control->version=ntohl(*(u32 *)(data+4));
+			p->control->token=ntohl(*(u32 *)(data+8));
+			p->ssrc=ntohl(*(u32 *)(data+12));
+			memcpy(p->control->name,data+16,len-16<40?len-16:40);
+			break;
+		case APPLEMIDI_CMD_ACCEPT:
+			//pass
+			break;
+		case APPLEMIDI_CMD_SYNC:
+			if(len != 36)
+				{return -1;}
+			p->ssrc=ntohl(*(u32 *)(data+4));
+			p->synchronisation->count=*(u8 *)(data+8);
+			p->synchronisation->timestamp1 = *(u64 *)(data+12);
+			p->synchronisation->timestamp2 = *(u64 *)(data+20);
+			p->synchronisation->timestamp3 = *(u64 *)(data+28);
+			break;
+	}
+	return(0);
+}
+
+static void callback(struct sock *sk, int bytes)
+{	
 	int len = 0;
 	int i = 0;
 
@@ -285,6 +386,7 @@ static int __init mod_init(void)
 		printk(KERN_ERR "server: Error creating controlsocket\n");
 		return -EIO;
 	}
+	
 	controlserver.sin_family = AF_INET;
 	controlserver.sin_addr.s_addr = INADDR_ANY;
 	controlserver.sin_port = htons((unsigned short)SERVERPORT);
@@ -293,7 +395,7 @@ static int __init mod_init(void)
 				     (struct sockaddr *)&controlserver,
 				     sizeof(controlserver));
 	if (servererror) {
-		printk(KERN_ERR "could not bind control socket");
+		printk(KERN_ERR "could not bind control socket\n");
 		goto control_fail;
 	}
 
@@ -311,14 +413,14 @@ static int __init mod_init(void)
 	    datasocket->ops->bind(datasocket, (struct sockaddr *)&dataserver,
 				  sizeof(dataserver));
 	if (servererror) {
-		printk("cound not bind data socket!\n");
+		printk(KERN_ERR "cound not bind data socket\n");
 		goto data_fail;
 	}
 
 	datasocket->sk->sk_data_ready = callback;
 
 	//get random ssrc:
-	get_random_bytes(&ssrc, 4);
+	get_random_bytes(&sess.ssrc, 4);
 	printk("chose ssrc %x\n", ssrc);
 
 	sess.control = false;
@@ -329,11 +431,11 @@ static int __init mod_init(void)
 
 	return 0;
 
- data_fail:
-	sock_release(datasocket);
+ 	data_fail:
+		sock_release(datasocket);
 
- control_fail:
-	sock_release(controlsocket);
+ 	control_fail:
+		sock_release(controlsocket);
 
 	return -EIO;
 
