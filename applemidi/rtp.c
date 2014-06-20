@@ -59,6 +59,40 @@ static void _session_randomize_ssrc(struct RTPSession *session)
 }
 
 /**
+ * @brief Create an RTPPeer instance.
+ * Allocate space and initialize an RTPPeer instance.
+ * @public @memberof RTPPeer
+ * @param ssrc The synchronization source identifier that uniquely identifies the peer.
+ * @param size The size of the address pointed to by @c addr.
+ * @param addr A pointer to an address that can be used to send packets to the client.
+ * @return a pointer to the created peer structure on success.
+ * @return a @c NULL pointer if the peer could not created.
+ */
+struct RTPPeer * RTPPeerCreate( unsigned long ssrc, int size, struct sockaddr * addr ) {
+  struct RTPPeer * peer = kmalloc( sizeof( struct RTPPeer ), GFP_KERNEL );
+  peer->refs = 1;
+  peer->address.ssrc = ssrc;
+  peer->address.size = size;
+  memcpy( &(peer->address.addr), addr, size );
+  peer->in_seqnum      = 0;
+  peer->in_timestamp   = 0;
+  peer->out_seqnum     = 0;
+  peer->out_timestamp  = 0;
+  peer->info = NULL;
+  return peer;
+}
+
+/**
+ * @brief Retain an RTPPeer instance.
+ * Increment the reference counter of a peer so that it won't be destroyed.
+ * @public @memberof RTPPeer
+ * @param peer The peer.
+ */
+void RTPPeerRetain( struct RTPPeer * peer ) {
+  peer->refs++;
+}
+
+/**
  * @brief Destroy an RTPPeer instance.
  * Free all resources occupied by the peer.
  * @public @memberof RTPPeer
@@ -166,3 +200,86 @@ void RTPSessionRelease(struct RTPSession *session)
 		RTPSessionDestroy(session);
 	}
 }
+
+
+/**
+ * @brief Add an RTPPeer to the session.
+ * Lookup the peer using the (pseudo) hash-table, add it to the list and retain it.
+ * The peer will be included when data is sent via RTPSessionSendPayload.
+ * @public @memberof RTPSession
+ * @param session The session.
+ * @param peer The peer to add.
+ * @retval 0 on success.
+ * @retval >0 if the peer could not be added.
+ */
+int RTPSessionAddPeer( struct RTPSession * session, struct RTPPeer * peer ) {
+  int i, off, p;
+  off = peer->address.ssrc % RTP_MAX_PEERS;
+  for( i=0; i < RTP_MAX_PEERS; i++ ) {
+    p = (i+off)%RTP_MAX_PEERS;
+    if( session->peers[p] == NULL ) {
+      session->peers[p] = peer;
+      RTPPeerRetain( peer );
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+/**
+ * @brief Remove an RTPPeer from the session.
+ * Lookup the peer using the (pseudo) hash-table, remove it from the list and release it.
+ * @public @memberof RTPSession
+ * @param session The session.
+ * @param peer The peer to remove.
+ * @retval 0 on success.
+ * @retval >0 if the peer could not be removed.
+ */
+int RTPSessionRemovePeer( struct RTPSession * session, struct RTPPeer * peer ) {
+  int i, off, p;
+  off = peer->address.ssrc % RTP_MAX_PEERS;
+  for( i=0; i < RTP_MAX_PEERS; i++ ) {
+    p = (i+off)%RTP_MAX_PEERS;
+    if( session->peers[p] == peer ) {
+      session->peers[p] = NULL;
+      RTPPeerRelease( peer );
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+int RTPSessionGetSSRC( struct RTPSession * session, unsigned long * ssrc ) {
+  if( ssrc == NULL ) return 1;
+  *ssrc = session->self.ssrc;
+  return 0;
+}
+
+
+/**
+ * Retrieve peer information by looking up the given SSRC identifier.
+ * @public @memberof RTPSession
+ * @param session The session.
+ * @param peer The peer.
+ * @param ssrc The SSRC.
+ * @retval 0 on success.
+ * @retval >0 if no peer with the given ssrc was found.
+ */
+int RTPSessionFindPeerBySSRC( struct RTPSession * session, struct RTPPeer ** peer,
+                              unsigned long ssrc ) {
+  int i, off, p;
+  off = ssrc % RTP_MAX_PEERS;
+  for( i=0; i < RTP_MAX_PEERS; i++ ) {
+    p = (i+off)%RTP_MAX_PEERS;
+    if( session->peers[p] != NULL ) {
+      if( session->peers[p]->address.ssrc == ssrc ) {
+        *peer = session->peers[p];
+        return 0;
+      }
+    }
+  }
+  return 1;
+}
+

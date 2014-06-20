@@ -18,7 +18,19 @@ struct RTPPacketInfo {
   struct iovec * iov;
 };
 
+struct RTPPeer * RTPPeerCreate( unsigned long ssrc, int size, struct sockaddr * addr );
+void RTPPeerRetain( struct RTPPeer * peer );
+void RTPPeerRelease( struct RTPPeer * peer );
+
 struct RTPSession * RTPSessionCreate( struct socket *sock );
 void RTPSessionDestroy( struct RTPSession * session );
 void RTPSessionRetain( struct RTPSession * session );
 void RTPSessionRelease( struct RTPSession * session );
+
+int RTPSessionAddPeer( struct RTPSession * session, struct RTPPeer * peer );
+int RTPSessionRemovePeer( struct RTPSession * session, struct RTPPeer * peer );
+
+int RTPSessionGetSSRC( struct RTPSession * session, unsigned long * ssrc );
+
+int RTPSessionFindPeerBySSRC( struct RTPSession * session, struct RTPPeer ** peer,
+                              unsigned long ssrc );
