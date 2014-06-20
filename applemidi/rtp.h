@@ -1,3 +1,6 @@
+#ifndef RTP_H
+#define RTP_H
+
 #include <net/sock.h>
 #include <linux/slab.h>
 
@@ -34,3 +37,5 @@ int RTPSessionGetSSRC( struct RTPSession * session, unsigned long * ssrc );
 
 int RTPSessionFindPeerBySSRC( struct RTPSession * session, struct RTPPeer ** peer,
                               unsigned long ssrc );
+							  
+#endif

@@ -11,7 +11,15 @@
 #include "rtp.h"
 #include "rtpmidi.h"
 
+#include "midi.h"
+
+#include "clock.h"
+
+#include "div64.h"
+
 typedef long long MIDITimestamp;
+
+#define APPLEMIDI_CLOCK_RATE 10000
 
 struct AppleMIDICommand {
 	struct RTPPeer *peer;	/* use peers sockaddr instead .. we get
@@ -42,7 +50,7 @@ struct AppleMIDICommand {
 };
 
 struct MIDIDriverAppleMIDI {
-	//struct MIDIDriver base;
+	struct MIDIDriver base;
 	struct socket *control_socket;
 	struct socket *rtp_socket;
 	unsigned short port;
@@ -267,6 +275,76 @@ static int _applemidi_recv_command( struct MIDIDriverAppleMIDI * driver, struct 
   return 0;
 }
 
+/**
+ * @brief Start or continue a synchronization session.
+ * Continue a synchronization session identified by a given command.
+ * The command must contain a pointer to a valid peer.
+ * @param driver The driver.
+ * @param fd The file descriptor to be used for communication.
+ * @param command The previous sync command.
+ * @retval 0 On success.
+ * @retval >0 If the synchronization failed.
+ */
+static int _applemidi_sync( struct MIDIDriverAppleMIDI * driver, struct sock *sk, struct AppleMIDICommand * command ) {
+  unsigned long ssrc;
+  MIDITimestamp timestamp, diff;
+  RTPSessionGetSSRC( driver->rtp_session, &ssrc );
+  MIDIClockGetNow( driver->base.clock, &timestamp );
+  timestamp=0;
+  if( command->type != APPLEMIDI_COMMAND_SYNCHRONIZATION || 
+      command->data.sync.ssrc == ssrc ||
+      command->data.sync.count > 2 ) {
+    command->type = APPLEMIDI_COMMAND_SYNCHRONIZATION;
+    command->data.sync.ssrc       = ssrc;
+    command->data.sync.count      = 0;
+    command->data.sync.timestamp1 = timestamp;
+    
+    driver->sync = 1;
+    return _applemidi_send_command( driver, sk, command );
+  } else {
+    RTPSessionFindPeerBySSRC( driver->rtp_session, &(driver->peer), command->data.sync.ssrc );
+
+    /* received packet from other peer */
+    if( command->data.sync.count == 2 ) {
+      /* compute media delay */
+      diff = ( command->data.sync.timestamp3 - command->data.sync.timestamp1 )/ 2;
+      /* approximate time difference between peer and self */
+      diff = command->data.sync.timestamp3 + diff - timestamp;
+
+      /* RTPPeerSetTimestampDiff( command->peer, diff ) */
+      /* finished sync */
+      command->data.sync.ssrc  = ssrc;
+      command->data.sync.count = 3;
+
+      driver->sync = 0;
+      return 0;
+    }
+    if( command->data.sync.count == 1 ) {
+      /* compute media delay */
+      diff = ( command->data.sync.timestamp3 - command->data.sync.timestamp1 )/ 2;
+      /* approximate time difference between peer and self */
+      diff = command->data.sync.timestamp2 + diff - timestamp;
+
+      /* RTPPeerSetTimestampDiff( command->peer, diff ) */
+
+      command->data.sync.ssrc       = ssrc;
+      command->data.sync.count      = 2;
+      command->data.sync.timestamp3 = timestamp;
+      
+      driver->sync = 0;
+      return _applemidi_send_command( driver, sk, command );
+    }
+    if( command->data.sync.count == 0 ) {
+      command->data.sync.ssrc       = ssrc;
+      command->data.sync.count      = 1;
+      command->data.sync.timestamp2 = timestamp;
+      
+      driver->sync = 2;
+      return _applemidi_send_command( driver, sk, command );
+    }
+  }
+  return 1;
+}
 
 /**
  * @brief Respond to a given AppleMIDI command.
@@ -333,7 +411,7 @@ static int _applemidi_respond( struct MIDIDriverAppleMIDI * driver, struct sock 
       }
       break;
     case APPLEMIDI_COMMAND_SYNCHRONIZATION:
-     // return _applemidi_sync( driver, sk, command );
+		return _applemidi_sync( driver, sk, command );
     case APPLEMIDI_COMMAND_RECEIVER_FEEDBACK:
       //RTPSessionFindPeerBySSRC( driver->rtp_session, &peer, command->data.feedback.ssrc );
       //RTPMIDISessionJournalTrunkate( driver->rtpmidi_session, peer, command->data.feedback.seqnum );
@@ -517,15 +595,13 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 	struct MIDIDriverAppleMIDI *driver;
 	MIDITimestamp timestamp;
 	
-	struct timeval tv;
-
 	driver = kmalloc(sizeof(struct MIDIDriverAppleMIDI), GFP_KERNEL);
 	if (driver == NULL) {
 		return NULL;
 	}
 
 	printk("allocated driver structure\n");
-	//MIDIDriverInit(&(driver->base), name, APPLEMIDI_CLOCK_RATE);
+	MIDIDriverInit(&(driver->base), name, APPLEMIDI_CLOCK_RATE);
 
 	driver->control_socket = NULL;
 	driver->rtp_socket = NULL;
@@ -549,13 +625,7 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 	driver->rtp_session = RTPSessionCreate(driver->rtp_socket); 
 	driver->rtpmidi_session = RTPMIDISessionCreate(driver->rtp_session);
 	
-	//MIDIClockGetNow(driver->base.clock, &timestamp); 
-	
-	do_gettimeofday(&tv);
-
-	//10khz sampling
-
-	timestamp = tv.tv_sec * 10000 + tv.tv_usec / 100;
+	MIDIClockGetNow(driver->base.clock, &timestamp); 
 	
 	driver->token = timestamp;
 	
@@ -581,11 +651,13 @@ void MIDIDriverAppleMIDIDestroy(struct MIDIDriverAppleMIDI *driver)
 	RTPSessionRelease(driver->rtp_session);
 	//MIDIMessageQueueRelease(driver->in_queue);
 	//MIDIMessageQueueRelease(driver->out_queue);
+	MIDIDriverRelease(&(driver->base));
 	kfree(driver);
 }
 
 static int __init mod_init(void)
 {
+	
 	printk("initializing applemidi\n");
 	raspi = MIDIDriverAppleMIDICreate("kernel", 5008);
 	if (raspi == NULL) {

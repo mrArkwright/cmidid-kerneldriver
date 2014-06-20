@@ -1,5 +1,5 @@
 obj-m += applertp.o
-applertp-objs := applemidi.o rtp.o rtpmidi.o
+applertp-objs := applemidi.o rtp.o rtpmidi.o div64.o midi.o clock.o _uldivmod.o
 #obj-m += applemidi.o
 
 SRC := $(shell pwd)
