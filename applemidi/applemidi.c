@@ -87,6 +87,9 @@ static int _applemidi_send_command( struct MIDIDriverAppleMIDI * driver, struct 
   unsigned int msg[16];
   int len,sentbytes=0;
   
+  struct sockaddr_in *a;
+  struct sockaddr_in to;
+  
   struct socket *source=NULL;
   
   mm_segment_t oldfs;
@@ -135,10 +138,10 @@ static int _applemidi_send_command( struct MIDIDriverAppleMIDI * driver, struct 
   }
 
   if( command->addr.sin_family == AF_INET ) {
-    struct sockaddr_in * a = (struct sockaddr_in *) &(command->addr);
+     a = (struct sockaddr_in *) &(command->addr);
     printk("send %i bytes to %pI4:%i on s(%p)\n", len, &a->sin_addr, ntohs(a->sin_port ), sk );
   	
-	struct sockaddr_in to;
+	
 	memset(&to, 0, sizeof(to));
 	to.sin_family = AF_INET;
 	to.sin_addr.s_addr = a->sin_addr.s_addr;
@@ -177,6 +180,7 @@ static int _applemidi_send_command( struct MIDIDriverAppleMIDI * driver, struct 
     	return 0;
  	}
   }
+  return 1;
 }
 
 /**
@@ -249,7 +253,7 @@ static int _applemidi_recv_command( struct MIDIDriverAppleMIDI * driver, struct 
         }
         ssrc = command->data.session.ssrc;
 		
-		printk("found session pkt: %c%c , ver:%d,token:%d,ssrc:%d, name:%s\n",command->type >> 8, command->type & 0xff, command->data.session.version, command->data.session.token, command->data.session.ssrc, command->data.session.name);
+		printk("found session pkt: %c%c , ver:%lu,token:%lu,ssrc:%lu, name:%s\n",command->type >> 8, command->type & 0xff, command->data.session.version, command->data.session.token, command->data.session.ssrc, command->data.session.name);
         break;
       case APPLEMIDI_COMMAND_SYNCHRONIZATION:
         if( len != 36 ) return 1;
@@ -262,7 +266,7 @@ static int _applemidi_recv_command( struct MIDIDriverAppleMIDI * driver, struct 
         command->data.sync.timestamp3  = (unsigned long long) ntohl( msg[7] ) << 32;
         command->data.sync.timestamp3 += ntohl( msg[8] );
         ssrc = command->data.sync.ssrc;
-		printk("found sync pkt: %c%c , ssrc:%u, cnt=%d, t1=%ul, t2=%ul, t3=%ul \n",command->type >> 8, command->type & 0xff,command->data.sync.ssrc,command->data.sync.count,command->data.sync.timestamp1,command->data.sync.timestamp2,command->data.sync.timestamp3);
+		printk("found sync pkt: %c%c , ssrc:%lu, cnt=%lu, t1=%llu, t2=%llu, t3=%llu \n",command->type >> 8, command->type & 0xff,command->data.sync.ssrc,command->data.sync.count,command->data.sync.timestamp1,command->data.sync.timestamp2,command->data.sync.timestamp3);
         break;
       case APPLEMIDI_COMMAND_RECEIVER_FEEDBACK:
         if( len != 12 ) return 1;
@@ -369,7 +373,7 @@ static int _applemidi_start_sync( struct MIDIDriverAppleMIDI * driver, struct so
  */
 static int _applemidi_respond( struct MIDIDriverAppleMIDI * driver, struct sock *sk, struct AppleMIDICommand * command ) {
   struct RTPPeer * peer = NULL;
-  struct MIDIEvent * event = NULL;
+  //struct MIDIEvent * event = NULL;
 
   switch( command->type ) {
     case APPLEMIDI_COMMAND_INVITATION:
@@ -610,14 +614,16 @@ _applemidi_disconnect(struct MIDIDriverAppleMIDI *driver, struct socket *sock)
 }
 
 void _applemidi_idle_timeout( unsigned long data) {
+ struct sockaddr * addr;
+ struct sockaddr_in * addr_in;
+  int size;
+	
 	// void * drv, struct timespec * ts 
-	printk("====called timeout (%ld) dat: %x ====\n",jiffies,data);
+	//printk("====called timeout (%ld) dat: %x ====\n",jiffies,data);
 	struct MIDIDriverAppleMIDI * driver = (struct MIDIDriverAppleMIDI *) data;
 	mod_timer( &driver->timer, jiffies + msecs_to_jiffies(1500) );
 	
-	 struct sockaddr * addr;
-	 struct sockaddr_in * addr_in;
-	  int size;
+	 
 //
 // _applemidi_update_runloop_source( driver );
 //
@@ -629,8 +635,9 @@ void _applemidi_idle_timeout( unsigned long data) {
         RTPPeerGetAddress( driver->peer, &size, &addr );
 		addr_in=(struct sockaddr_in *)addr;
 		printk("start sync with client: %pI4\n",&addr_in->sin_addr);
-        return _applemidi_start_sync( driver, driver->rtp_socket->sk, size, addr );
-      }
+        _applemidi_start_sync( driver, driver->rtp_socket->sk, size, addr );
+      	//no return
+	  }
     }
 //
 // /* check for messages in dispatch (incoming) queue:

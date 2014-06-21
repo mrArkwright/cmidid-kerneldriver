@@ -35,7 +35,7 @@ int main() {
         map['s']=62;
         map['a']=60;
 
-	system("stty raw"); 
+	//system("stty raw"); 
 	
 	while(1) {
 		key = getchar();
@@ -85,7 +85,7 @@ int main() {
 		//if (inc >= 68) inc = 60;
 	}
 	
-	system("stty cooked"); 
+	//system("stty cooked"); 
 	
 	return 0;
 }

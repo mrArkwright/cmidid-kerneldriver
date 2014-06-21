@@ -2,6 +2,7 @@
 
 #include "midi.h"
 #include "clock.h"
+#include "alsa.h"
 	
 /**
  * @brief Initialize a MIDIDriver instance.
@@ -11,10 +12,13 @@
  */
 void MIDIDriverInit( struct MIDIDriver * driver, char * name, MIDISamplingRate rate ) {
   //MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
+	
+	printk("init MIDIDriver\n");
 
   driver->refs  = 1;
   //driver->rls   = NULL;
   //driver->port  = MIDIPortCreate( name, MIDI_PORT_IN | MIDI_PORT_OUT, driver, &_port_receive );
+  driver->port = ALSARegisterClient();//ALSARegisterClient();
   driver->clock = MIDIClockProvide( rate );
 
   //driver->send    = NULL;
@@ -35,6 +39,7 @@ void MIDIDriverDestroy( struct MIDIDriver * driver ) {
   if( driver->clock != NULL ) {
     MIDIClockRelease( driver->clock );
   }
+  ALSADeleteClient(driver->port);
   /*if( driver->rls != NULL ) {
     MIDIRunloopSourceInvalidate( driver->rls );
     MIDIRunloopSourceRelease( driver->rls );

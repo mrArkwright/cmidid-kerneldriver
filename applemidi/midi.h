@@ -8,6 +8,7 @@ struct MIDIDriver {
   size_t refs;
   //struct MIDIRunloopSource * rls;
   //struct MIDIPort * port;
+  struct ALSADriver * port;
   struct MIDIClock * clock;
   //int (*send)( void * driver, struct MIDIMessage * message );
   //void (*destroy)( void * driver );
