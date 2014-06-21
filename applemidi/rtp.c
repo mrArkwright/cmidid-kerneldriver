@@ -118,6 +118,22 @@ void RTPPeerRelease(struct RTPPeer *peer)
 }
 
 /**
+ * @brief Obtain the size of the address and a pointer to it's content.
+ * @public @memberof RTPPeer
+ * @param peer The peer.
+ * @param size The size.
+ * @param addr The address.
+ * @retval 0 on success.
+ * @retval >0 if the address could not be obtained.
+ */
+int RTPPeerGetAddress( struct RTPPeer * peer, int * size, struct sockaddr ** addr ) {
+  if( size == NULL || addr == NULL ) return 1;
+  *size =   peer->address.size;
+  *addr = (struct sockaddr *) &(peer->address.addr);
+  return 0;
+}
+
+/**
  * @brief Create an RTPSession instance.
  * Allocate space and initialize an RTPSession instance.
  * @public @memberof RTPSession
@@ -257,6 +273,40 @@ int RTPSessionGetSSRC( struct RTPSession * session, unsigned long * ssrc ) {
   return 0;
 }
 
+/**
+ * @brief Advance the pointer to the next peer.
+ * Given a @c NULL pointer the first peer will be returned. When the
+ * last peer was reached a @c NULL pointer will be returned.
+ * @public @memberof RTPSession
+ * @param session The session.
+ * @param peer The peer.
+ * @retval 0 on success.
+ * @retval >0 if the given peer does not exist.
+ */
+int RTPSessionNextPeer( struct RTPSession * session, struct RTPPeer ** peer ) {
+  int i;
+  if( peer == NULL ) return 1;
+  if( *peer == NULL ) {
+    i=-1;
+  } else {
+    for( i=0; i < RTP_MAX_PEERS; i++ ) {
+      if( session->peers[i] == *peer ) {
+        break;
+      }
+    }
+    if( i == RTP_MAX_PEERS ) return 1;
+  }
+
+  do {
+     i++;
+  } while( i < RTP_MAX_PEERS && session->peers[i] == NULL );
+  if( i == RTP_MAX_PEERS ) {
+    *peer = NULL;
+  } else {
+    *peer = session->peers[i];
+  }
+  return 0;
+}
 
 /**
  * Retrieve peer information by looking up the given SSRC identifier.

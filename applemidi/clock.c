@@ -13,8 +13,8 @@ static void _init_clock_kernel( struct MIDIClock * clock ) {
 }
 
 static unsigned long long _timestamp_kernel( void ) {
-	ktime_get();
-  return(0);
+	ktime_t t=ktime_get();
+  return(t.tv64);
 }
 
 
