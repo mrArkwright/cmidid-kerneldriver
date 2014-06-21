@@ -54,27 +54,27 @@ int main() {
 		noteon[1] = inc;
 		noteoff[1] = inc;
 		snd_rawmidi_write(midiout, noteon, 3);
-		noteon[1] = inc+4;
+		/*noteon[1] = inc+4;
 		snd_rawmidi_write(midiout, noteon, 3);
                 noteon[1] = inc+7;
 		snd_rawmidi_write(midiout, noteon, 3);
 		noteon[1] = inc-13;
                 snd_rawmidi_write(midiout, noteon, 3);
 		noteon[1] = inc+13;
-                snd_rawmidi_write(midiout, noteon, 3);
+                snd_rawmidi_write(midiout, noteon, 3);*/
 		//	printf("note on\n");
 		
 		msleep(500);
 		
 		snd_rawmidi_write(midiout, noteoff, 3);
-		noteoff[1] = inc+4;
+		/*noteoff[1] = inc+4;
                 snd_rawmidi_write(midiout, noteoff, 3);
                 noteoff[1] = inc+7;
                 snd_rawmidi_write(midiout, noteoff, 3);
 		noteoff[1] = inc-13;
                 snd_rawmidi_write(midiout, noteoff, 3);
                 noteoff[1] = inc+13;
-                snd_rawmidi_write(midiout, noteoff, 3);
+                snd_rawmidi_write(midiout, noteoff, 3);*/
 		//printf("note off\n");
 		
 		//msleep(25);

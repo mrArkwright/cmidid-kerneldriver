@@ -40,4 +40,6 @@ int RTPSessionNextPeer( struct RTPSession * session, struct RTPPeer ** peer );
 int RTPSessionFindPeerBySSRC( struct RTPSession * session, struct RTPPeer ** peer,
                               unsigned long ssrc );
 							  
+int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * info );
+							  
 #endif

@@ -10,7 +10,7 @@
  * @param name The name to identify the driver.
  * @param rate The sampling rate to use.
  */
-void MIDIDriverInit( struct MIDIDriver * driver, char * name, MIDISamplingRate rate ) {
+void MIDIDriverInit( struct MIDIDriver * driver, char * name, MIDISamplingRate rate , void * drv) {
   //MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
 	
 	printk("init MIDIDriver\n");
@@ -18,7 +18,7 @@ void MIDIDriverInit( struct MIDIDriver * driver, char * name, MIDISamplingRate r
   driver->refs  = 1;
   //driver->rls   = NULL;
   //driver->port  = MIDIPortCreate( name, MIDI_PORT_IN | MIDI_PORT_OUT, driver, &_port_receive );
-  driver->port = ALSARegisterClient();//ALSARegisterClient();
+  driver->port = ALSARegisterClient(drv);//ALSARegisterClient();
   driver->clock = MIDIClockProvide( rate );
 
   //driver->send    = NULL;

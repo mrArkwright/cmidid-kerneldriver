@@ -3,7 +3,7 @@
 
 struct ALSADriver;
 
-struct ALSADriver * ALSARegisterClient(void);
+struct ALSADriver * ALSARegisterClient(void * drv);
 
 void ALSADeleteClient(struct ALSADriver *);
 

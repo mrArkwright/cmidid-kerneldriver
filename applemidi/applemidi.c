@@ -16,61 +16,18 @@
 
 #include "clock.h"
 
-typedef long long MIDITimestamp;
 
-#define APPLEMIDI_CLOCK_RATE 10000
 
-struct AppleMIDICommand {
-	struct RTPPeer *peer;	/* use peers sockaddr instead .. we get
-				 * initialization problems otherwise */
-	struct sockaddr_in addr;
-	int size;
-	/* unsigned short channel; */
-	unsigned short type;
-	union {
-		struct {
-			unsigned long version;
-			unsigned long token;
-			unsigned long ssrc;
-			char name[64];
-		} session;
-		struct {
-			unsigned long ssrc;
-			unsigned long count;
-			unsigned long long timestamp1;
-			unsigned long long timestamp2;
-			unsigned long long timestamp3;
-		} sync;
-		struct {
-			unsigned long ssrc;
-			unsigned long seqnum;
-		} feedback;
-	} data;
-};
 
-struct MIDIDriverAppleMIDI {
-	struct MIDIDriver base;
-	struct socket *control_socket;
-	struct socket *rtp_socket;
-	unsigned short port;
-	unsigned char accept;
-	unsigned char sync;
-	unsigned long token;
-	char name[32];
-	
-	struct timer_list timer;
 
-	struct AppleMIDICommand command;
 
-	struct RTPPeer *peer;
-	struct RTPSession *rtp_session;
-	struct RTPMIDISession *rtpmidi_session;
-
-	struct MIDIMessageQueue *in_queue;
-	struct MIDIMessageQueue *out_queue;
-};
 
 struct MIDIDriverAppleMIDI *raspi;
+
+
+
+
+
 
 /**
  * @brief Send the given AppleMIDI command.
@@ -669,7 +626,7 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 	printk("placed driver at %p\n",driver);
 
 	printk("allocated driver structure\n");
-	MIDIDriverInit(&(driver->base), name, APPLEMIDI_CLOCK_RATE);
+	MIDIDriverInit(&(driver->base), name, APPLEMIDI_CLOCK_RATE,(void *)driver);
 
 	driver->control_socket = NULL;
 	driver->rtp_socket = NULL;

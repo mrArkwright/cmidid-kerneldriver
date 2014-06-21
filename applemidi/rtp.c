@@ -333,3 +333,192 @@ int RTPSessionFindPeerBySSRC( struct RTPSession * session, struct RTPPeer ** pee
   return 1;
 }
 
+static int _rtp_encode_header( struct RTPPacketInfo * info, size_t size, void * data, size_t * written ) {
+  int i, j;
+  unsigned char * buffer = data;
+  size_t header_size = 12 + ( info->csrc_count * 4 );
+  
+  printk("RTP encode header\n");
+
+  if( size < header_size ) return 1;
+    
+  buffer[0] = 0x80
+            | ( info->padding ? 0x20 : 0 )
+            | ( info->extension ? 0x10 : 0 )
+            | ( info->csrc_count & 0x0f );
+  
+  buffer[1] = ( info->payload_type & 0x7f )
+            | ( info->marker ? 0x80 : 0x00 );
+  
+  buffer[2] = ( info->sequence_number >> 8 ) & 0xff;
+  buffer[3] =   info->sequence_number        & 0xff;
+
+  buffer[4] = ( info->timestamp >> 24 ) & 0xff;
+  buffer[5] = ( info->timestamp >> 16 ) & 0xff;
+  buffer[6] = ( info->timestamp >> 8 )  & 0xff;
+  buffer[7] =   info->timestamp         & 0xff;
+
+  buffer[8]  = ( info->ssrc >> 24 ) & 0xff;
+  buffer[9]  = ( info->ssrc >> 16 ) & 0xff;
+  buffer[10] = ( info->ssrc >> 8 )  & 0xff;
+  buffer[11] =   info->ssrc         & 0xff;
+
+  for( i=0, j=0; i<info->csrc_count; i++, j+=4 ) {
+    buffer[12+j] = ( info->csrc[i] >> 24 ) & 0xff;
+    buffer[13+j] = ( info->csrc[i] >> 16 ) & 0xff;
+    buffer[14+j] = ( info->csrc[i] >> 8 )  & 0xff;
+    buffer[15+j] =   info->csrc[i]         & 0xff;
+  }
+  
+  *written = header_size;
+  return 0;
+}
+
+static int _rtp_encode_extension( struct RTPPacketInfo * info, size_t size, void * data, size_t * written ) {
+  int i;
+  unsigned char * buffer = data;
+  size_t ext_header_size;
+  
+  printk("RTP encode extension\n");
+  
+  if( info->extension ) {
+    if( info->iovlen < 1 ) return 1;
+    ext_header_size = info->iov[0].iov_len;
+    if( ext_header_size % 4 || ext_header_size == 0 ) {
+      /* fill up to whole 4 bytes words */
+      ext_header_size += 4 - (info->iov[0].iov_len % 4);
+    }
+
+    memcpy( buffer, info->iov[0].iov_base, info->iov[0].iov_len );
+    i = ext_header_size / 4;
+    buffer[2] = ( i >> 8 ) & 0xff;
+    buffer[3] =   i        & 0xff;
+  } else {
+    ext_header_size = 0;
+  }
+  
+  *written = ext_header_size;
+  return 0;
+}
+
+static int _rtp_encode_padding( struct RTPPacketInfo * info, size_t size, void * data, size_t * written ) {
+  unsigned char * buffer = data;
+  
+  printk("RTP encode padding\n");
+  
+  if( info->padding ) {
+    if( size < info->padding ) return 1;
+    buffer[info->padding-1] = info->padding;
+  }
+  *written = info->padding;
+  return 0;
+}
+
+static void _advance_buffer( size_t * size, void ** buffer, size_t bytes ) {
+	printk("RTP advance buf\n");
+  *size   -= bytes;
+  *buffer += bytes;
+}
+
+static void _append_iov( size_t * iovlen, struct iovec * iov, size_t size, void * buffer ) {
+	printk("RTP append iov\n");
+  iov[*iovlen].iov_len  = size;
+  iov[*iovlen].iov_base = buffer;
+  *iovlen += 1;
+}
+
+
+/**
+ * @brief Send an RTP packet.
+ * @public @memberof RTPSession
+ * @param session The session.
+ * @param info The packet info.
+ * @retval 0 On success.
+ * @retval >0 If the message could not be sent.
+ */
+int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * info ) {
+  size_t size, written = 0, iovlen = 0;
+  void * buffer;
+  struct msghdr msg;
+  struct iovec  iov[RTP_IOV_LEN+3];
+  ssize_t bytes_sent;
+  
+  mm_segment_t oldfs;
+  
+  printk("RTP send message\n");
+  
+  if( info == NULL || info->peer == NULL ) return 1;
+  if( info->iovlen > RTP_IOV_LEN ) return 1;
+  
+  size   = session->buflen;
+  buffer = session->buffer;
+
+  info->ssrc            = session->self.ssrc;
+  info->sequence_number = info->peer->out_seqnum + 1;
+
+  info->total_size = 0;
+  _rtp_encode_header( info, size, buffer, &written );
+  _append_iov( &iovlen, &(iov[0]), written, buffer );
+  _advance_buffer( &size, &buffer, written );
+  info->total_size += written;
+  if( info->extension ) {
+    _rtp_encode_extension( info, size, &buffer, &written );
+    _append_iov( &iovlen, &(iov[0]), written, buffer );
+    _advance_buffer( &size, &buffer, written );
+    info->total_size += written;
+  }
+  info->payload_size = 0;
+  while( (iovlen-1)<info->iovlen ) {
+    info->payload_size += info->iov[iovlen-1].iov_len;
+    _append_iov( &iovlen, &(iov[0]), info->iov[iovlen-1].iov_len, info->iov[iovlen-1].iov_base );
+  }
+  info->total_size += info->payload_size;
+  if( info->padding ) {
+    _rtp_encode_padding( info, size, &buffer, &written );
+    _append_iov( &iovlen, &(iov[0]), written, buffer );
+    _advance_buffer( &size, &buffer, written );
+    info->total_size += written;
+  }
+
+  printk("RTP Sending RTP message consisting of %i iovecs.\n", (int) iovlen );
+  int i, j;
+  for( i=0; i<iovlen; i++ ) {
+    printk("[%i] iov_len: %i, iov_base: %p\n", i, (int) iov[i].iov_len, iov[i].iov_base );
+    for( j=0; j<iov[i].iov_len; j++ ) {
+      unsigned char c = *((unsigned char*)iov[i].iov_base+j);
+      if( (j+1) % 8 == 0 || j+1 == iov[i].iov_len ) {
+        printk("0x%02x\n", c );
+      } else {
+        printk("0x%02x ", c );
+      }
+    }
+  }
+
+  msg.msg_name       = &(info->peer->address.addr);
+  msg.msg_namelen    = info->peer->address.size;
+  msg.msg_iov        = &(iov[0]);
+  msg.msg_iovlen     = iovlen;
+  msg.msg_control    = NULL;
+  msg.msg_controllen = 0;
+  msg.msg_flags      = 0;
+
+
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	bytes_sent=sock_sendmsg(session->socket, &msg, info->total_size);
+	set_fs(oldfs);
+  //bytes_sent = sendmsg( session->socket, &msg, 0 );
+	
+	printk("RTP bytes sent: %i of %i\n",bytes_sent,info->total_size);
+
+  if( bytes_sent != info->total_size ) {
+    return bytes_sent;
+  } else if( msg.msg_flags != 0 ) {
+    return 1;
+  } else {
+    info->peer->out_seqnum    = info->sequence_number;
+    info->peer->out_timestamp = info->timestamp;
+    return 0;
+  }
+}
+
