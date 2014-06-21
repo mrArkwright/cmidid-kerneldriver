@@ -629,7 +629,7 @@ void _applemidi_idle_timeout( unsigned long data) {
         RTPPeerGetAddress( driver->peer, &size, &addr );
 		addr_in=(struct sockaddr_in *)addr;
 		printk("start sync with client: %pI4\n",&addr_in->sin_addr);
-        return _applemidi_start_sync( driver, driver->rtp_socket, size, addr );
+        return _applemidi_start_sync( driver, driver->rtp_socket->sk, size, addr );
       }
     }
 //
