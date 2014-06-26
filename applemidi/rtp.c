@@ -10,7 +10,7 @@
 struct RTPAddress {
 	unsigned long ssrc;
 	int size;
-	struct sockaddr_storage addr;
+	struct sockaddr_in addr;
 };
 
 struct RTPPeer {
@@ -68,12 +68,13 @@ static void _session_randomize_ssrc(struct RTPSession *session)
  * @return a pointer to the created peer structure on success.
  * @return a @c NULL pointer if the peer could not created.
  */
-struct RTPPeer * RTPPeerCreate( unsigned long ssrc, int size, struct sockaddr * addr ) {
+struct RTPPeer * RTPPeerCreate( unsigned long ssrc, int size, struct sockaddr_in * addr ) {
   struct RTPPeer * peer = kmalloc( sizeof( struct RTPPeer ), GFP_KERNEL );
   peer->refs = 1;
   peer->address.ssrc = ssrc;
   peer->address.size = size;
-  memcpy( &(peer->address.addr), addr, size );
+  memcpy( &(peer->address.addr), addr, sizeof(struct sockaddr_in) );
+  printk("added RTP client %pI4:%d\n",&peer->address.addr.sin_addr.s_addr,peer->address.addr.sin_port);
   peer->in_seqnum      = 0;
   peer->in_timestamp   = 0;
   peer->out_seqnum     = 0;
@@ -126,10 +127,10 @@ void RTPPeerRelease(struct RTPPeer *peer)
  * @retval 0 on success.
  * @retval >0 if the address could not be obtained.
  */
-int RTPPeerGetAddress( struct RTPPeer * peer, int * size, struct sockaddr ** addr ) {
+int RTPPeerGetAddress( struct RTPPeer * peer, int * size, struct sockaddr_in ** addr ) {
   if( size == NULL || addr == NULL ) return 1;
   *size =   peer->address.size;
-  *addr = (struct sockaddr *) &(peer->address.addr);
+  *addr =  &(peer->address.addr);
   return 0;
 }
 
@@ -443,6 +444,8 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
   struct iovec  iov[RTP_IOV_LEN+3];
   ssize_t bytes_sent;
   
+  struct sockaddr_in *a;
+  
   mm_segment_t oldfs;
   
   printk("RTP send message\n");
@@ -493,9 +496,17 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
       }
     }
   }
+  
+  
+	//to.sin_family = AF_INET;
+	//to.sin_addr.s_addr = a->sin_addr.s_addr;
+	//to.sin_port=a->sin_port;
+  a = &(info->peer->address.addr);
+  printk("send %i bytes to %pI4:%i on s(%p)\n", info->total_size, &a->sin_addr.s_addr, ntohs(a->sin_port ), session->socket->sk );
 
-  msg.msg_name       = &(info->peer->address.addr);
+  msg.msg_name       =  &(info->peer->address.addr);
   msg.msg_namelen    = info->peer->address.size;
+  //msg.msg_namelen    = info->peer->address.size;
   msg.msg_iov        = &(iov[0]);
   msg.msg_iovlen     = iovlen;
   msg.msg_control    = NULL;

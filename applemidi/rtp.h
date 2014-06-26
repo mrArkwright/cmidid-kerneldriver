@@ -21,10 +21,10 @@ struct RTPPacketInfo {
   struct iovec * iov;
 };
 
-struct RTPPeer * RTPPeerCreate( unsigned long ssrc, int size, struct sockaddr * addr );
+struct RTPPeer * RTPPeerCreate( unsigned long ssrc, int size, struct sockaddr_in * addr );
 void RTPPeerRetain( struct RTPPeer * peer );
 void RTPPeerRelease( struct RTPPeer * peer );
-int RTPPeerGetAddress( struct RTPPeer * peer, int * size, struct sockaddr ** addr );
+int RTPPeerGetAddress( struct RTPPeer * peer, int * size, struct sockaddr_in ** addr );
 
 struct RTPSession * RTPSessionCreate( struct socket *sock );
 void RTPSessionDestroy( struct RTPSession * session );
