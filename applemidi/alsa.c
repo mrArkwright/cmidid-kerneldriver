@@ -10,6 +10,9 @@
 #include "applemidi.h"
 #include "clock.h"
 
+#define SND_SEQ_EVENT_NOTEON 6
+#define SND_SEQ_EVENT_NOTEOFF 7
+
 struct privateData{
 	struct MIDIMessageList list;
 	struct MIDIMessage msg;
@@ -36,12 +39,27 @@ _alsa_input(struct snd_seq_event *ev, int direct, void *private_data,
 	    int atomic, int hop)
 {
 	struct privateData *data= (struct privateData *)private_data;
-	printk("callback from alsa received\n");
+	printk("callback from alsa received of type %d\n",ev->type);
 	
 	//data->list[0].message=;
-	data->msg.data.bytes[0]=0x90;
-	data->msg.data.bytes[1]=0x24;
-	data->msg.data.bytes[2]=0x30;
+    
+    if(ev->type == SND_SEQ_EVENT_NOTEON)
+    {
+        data->msg.data.bytes[0]=0x90;
+    }
+    else if(ev->type == SND_SEQ_EVENT_NOTEOFF)
+    {
+        data->msg.data.bytes[0]=0x80;
+    }
+    else
+    {
+        return 1;
+    }
+    
+    
+	data->msg.data.bytes[0] |= ev->data.note.channel & 0xf;
+	data->msg.data.bytes[1]=ev->data.note.note;
+	data->msg.data.bytes[2]=ev->data.note.velocity;
 	data->msg.data.bytes[3]=0;
 	data->msg.data.size=3;
 	data->msg.data.data=NULL;
