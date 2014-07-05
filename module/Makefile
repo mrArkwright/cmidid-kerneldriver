@@ -1,4 +1,7 @@
+# Module (.ko) source file:
 obj-m += cmidid.o
+# Other source files:
+cmidid-objs := cmidid_midi.o cmidid_gpio.o cmidid_main.o
 
 SRC := $(shell pwd)
 KSRC:=/lib/modules/$(shell uname -r)/build
