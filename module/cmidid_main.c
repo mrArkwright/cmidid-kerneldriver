@@ -1,8 +1,5 @@
 #define DEBUG
-<<<<<<< HEAD
-=======
 
->>>>>>> a3ea9db66863e7af7776c0edd8b05c813b7a818e
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -48,12 +45,8 @@ MODULE_PARM_DESC(requested_gpios, "ids for the required gpios.");
 static int __init cmidid_init(void)
 {
 	int err;
-<<<<<<< HEAD
 	pr_debug("Module initializing...");
 
-=======
-	return -1337;
->>>>>>> a3ea9db66863e7af7776c0edd8b05c813b7a818e
 	if (alloc_chrdev_region(&cmidid_dev_number, 0, 1, IOCTL_DEV_NAME) < 0) {
 		pr_err("error allocating character device region");
 		return -EIO;
@@ -120,17 +113,6 @@ static void __exit cmidid_exit(void)
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	dbg("`cmidid_ioctl' called with f=%p, cmd=%d, arg=%lu\n", f, cmd, arg);
-<<<<<<< HEAD
-=======
 
-	switch (cmd) {
-	case CMIDID_CALIBRATE:
-		dbg("definitely calibrating now!\n");
-		break;
-	default:
-		dbg("unknown ioctl\n");
-	}
-
->>>>>>> a3ea9db66863e7af7776c0edd8b05c813b7a818e
 	return 0;
 }
