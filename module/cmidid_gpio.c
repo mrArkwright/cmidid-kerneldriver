@@ -155,16 +155,17 @@ int gpio_init(void)
 			    state.buttons[i].gpio_end.gpio);
 			goto free_buttons;
 		}
+
 		if ((err =
 		     request_irq(state.buttons[i].irq_start, irq_handler,
-				 IRQ_TRIGGER, NULL, NULL)) < 0) {
+				 IRQ_TRIGGER, "irq_start", NULL)) < 0) {
 			err("Could not request irq for button %d.\n",
 			    state.buttons[i].id);
 			goto free_buttons;
 		}
 		if ((err =
 		     request_irq(state.buttons[i].irq_end, irq_handler,
-				 IRQ_TRIGGER, NULL, NULL)) < 0) {
+				 IRQ_TRIGGER, "irq_end", NULL)) < 0) {
 			err("Could not request irq for button %d.\n",
 			    state.buttons[i].id);
 			goto free_buttons;
