@@ -2,6 +2,7 @@
 #define CMIDID_MAIN_H
 
 #include <linux/kernel.h>
+#include <linux/device.h>
 
 #define MODULE_NAME "cmidid"
 
@@ -23,23 +24,27 @@
 
 
 /**********************************************************************
- * Logging Settings
- *
- * You can use `info(...)' instead of `printk(KERN_INFO ...)'
- * and `err(...)' instead of `printk(KERN_ERR ...)'.
+ * Logging wrapper functions
  *
  * The `err' macro is really useful, because it prints the filename,
  * line number and function name alongside the error message.
  **********************************************************************/
-
-#define LOGPREFIX "[" MODULE_NAME "] "
+extern struct device *cmidid_device;
 
 #define info(fmt, ...) \
-        printk(KERN_INFO LOGPREFIX "[%s] " pr_fmt(fmt), \
+        dev_info(cmidid_device, "[%s] " pr_fmt(fmt), \
+                        __func__, ##__VA_ARGS__)
+
+#define dbg(fmt, ...) \
+        dev_dbg(cmidid_device, "[%s:%d %s] Debug: " pr_fmt(fmt), \
+                        __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+
+#define warn(fmt, ...) \
+        dev_warn(cmidid_device, "[%s] " pr_fmt(fmt), \
                         __func__, ##__VA_ARGS__)
 
 #define err(fmt, ...) \
-        printk(KERN_ERR LOGPREFIX "[%s:%d %s] Error: " pr_fmt(fmt), \
+        dev_err(cmidid_device, "[%s:%d %s] Error: " pr_fmt(fmt), \
                         __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
 #endif

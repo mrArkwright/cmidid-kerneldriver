@@ -3,8 +3,8 @@
 
 int midi_init(void);
 
-void midi_exit(void);
+void send_note(unsigned char notevalue, unsigned char velocity);
 
-void send_note(unsigned char, unsigned char);
+void midi_exit(void);
 
 #endif

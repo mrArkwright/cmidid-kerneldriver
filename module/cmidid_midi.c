@@ -1,6 +1,3 @@
-#include <linux/version.h>
-#include <linux/module.h>
-#include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/slab.h>
 
@@ -49,9 +46,8 @@ void send_note(unsigned char notevalue, unsigned char velocity)
 		    snd_seq_kernel_client_dispatch(client, &note, in_atomic(),
 						   0);
 		if (err < 0) {
-			printk(KERN_ERR LOGPREFIX
-			       "Error dispatch client(%d) code:%d\n", client,
-			       err);
+			warn("Error dispatch client(%d) code:%d\n", client,
+			     err);
 		}
 	}
 }
@@ -65,13 +61,13 @@ int midi_init(void)
 	    snd_card_create(-1, NULL, THIS_MODULE, sizeof(struct snd_card),
 			    &card);
 	if (err < 0) {
-		printk(KERN_INFO LOGPREFIX "error creating card: %d\n", err);
+		err("error creating card: %d\n", err);
 		return err;
 	}
 
-	client = snd_seq_create_kernel_client(card, 0, "new_midi-client");
+	client = snd_seq_create_kernel_client(card, 0, "cmidid");
 	if (client < 0) {
-		printk(KERN_INFO LOGPREFIX "error creating client: %d\n", err);
+		err("error creating client: %d\n", err);
 		return err;
 	}
 
@@ -81,7 +77,6 @@ int midi_init(void)
 		return err;
 	}
 	pinfo->addr.client = client;
-	//pinfo->capability |= SNDRV_SEQ_PORT_CAP_WRITE | SNDRV_SEQ_PORT_CAP_SYNC_WRITE | SNDRV_SEQ_PORT_CAP_SUBS_WRITE;
 	pinfo->capability |=
 	    SNDRV_SEQ_PORT_CAP_READ | SNDRV_SEQ_PORT_CAP_SYNC_READ |
 	    SNDRV_SEQ_PORT_CAP_SUBS_READ;
@@ -90,7 +85,7 @@ int midi_init(void)
 	    snd_seq_kernel_client_ctl(client, SNDRV_SEQ_IOCTL_CREATE_PORT,
 				      pinfo);
 	if (err < 0) {
-		printk(KERN_INFO LOGPREFIX "error creating port: %d\n", err);
+		err("error creating port: %d\n", err);
 		return err;
 	}
 

@@ -28,19 +28,20 @@ static struct file_operations cmidid_fops = {
 static dev_t cmidid_dev_number;
 static struct cdev *cmidid_driver_object;
 static struct class *cmidid_class;
-static struct device *cmidid_devive;
+struct device *cmidid_device;
 
 static int __init cmidid_init(void)
 {
 	int err;
 
-	info("Module initializing...\n");
-
-	if (alloc_chrdev_region(&cmidid_dev_number, 0, 1, IOCTL_DEV_NAME) < 0)
+	if (alloc_chrdev_region(&cmidid_dev_number, 0, 1, IOCTL_DEV_NAME) < 0) {
+		pr_err("error allocating character device region");
 		return -EIO;
+	}
 
 	cmidid_driver_object = cdev_alloc();
 	if (cmidid_driver_object == NULL) {
+		pr_err("error allocating character device");
 		err = -EIO;
 		goto free_device_number;
 	}
@@ -48,15 +49,18 @@ static int __init cmidid_init(void)
 	cmidid_driver_object->ops = &cmidid_fops;
 
 	if (cdev_add(cmidid_driver_object, cmidid_dev_number, 1)) {
+		pr_err("error adding character device");
 		err = -EIO;
 		goto free_cdev;
 	}
 
 	cmidid_class = class_create(THIS_MODULE, IOCTL_DEV_NAME);
 
-	cmidid_devive =
+	cmidid_device =
 	    device_create(cmidid_class, NULL, cmidid_dev_number, NULL, "%s",
 			  IOCTL_DEV_NAME);
+
+	dbg("Module initializing...\n");
 
 	if ((err = midi_init()) < 0) {
 		err("%d. Could not initialize MIDI component.\n", err);
@@ -86,10 +90,12 @@ static int __init cmidid_init(void)
 
 static void __exit cmidid_exit(void)
 {
-	info("Module exiting...\n");
+	dbg("Module exiting...\n");
 
 	gpio_exit();
 	midi_exit();
+
+	dbg("Unregistering char device\n");
 
 	/* Delete Sysfs entry and device file  */
 	device_destroy(cmidid_class, cmidid_dev_number);
@@ -97,13 +103,11 @@ static void __exit cmidid_exit(void)
 	/* Deletion of driver */
 	cdev_del(cmidid_driver_object);
 	unregister_chrdev_region(cmidid_dev_number, 1);
-
-	info("Unregistered char device\n");
 }
 
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-	info("`cmidid_ioctl' called with f=%p, cmd=%d, arg=%lu\n", f, cmd, arg);
+	dbg("`cmidid_ioctl' called with f=%p, cmd=%d, arg=%lu\n", f, cmd, arg);
 
 	return 0;
 }
