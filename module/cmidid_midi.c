@@ -15,6 +15,8 @@
 #include <sound/core.h>
 #include <sound/seq_device.h>
 
+#include "cmidid_main.h"
+
 static int cmidid_dev_register(struct snd_rawmidi *);
 static int cmidid_dev_unregister(struct snd_rawmidi *);
 static int cmididi_input_open(struct snd_rawmidi_substream *);
