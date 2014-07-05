@@ -2,7 +2,7 @@
 
 aconnect -x
 rmmod cmidid
-insmod cmidid.ko requested_gpios=22,4,345,435,1,2
+insmod cmidid.ko requested_gpios=19,20,70
 aconnect 24:0 128:0
 
 # MODNAME=$(cat cmidid_main.h | grep "#define MODULE_NAME" | awk '{print $3}' | sed -e 's/"//g')

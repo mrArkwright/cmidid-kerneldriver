@@ -4,7 +4,11 @@
 #include <linux/kernel.h>
 #include <linux/device.h>
 
+
 #define MODULE_NAME "cmidid"
+
+/* Maximum size for input array requested_gpios. */
+#define MAX_REQUEST 32
 
 /***********************************************************************
  * ioctl Settings
