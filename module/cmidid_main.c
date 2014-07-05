@@ -1,3 +1,5 @@
+#define DEBUG
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -33,7 +35,7 @@ struct device *cmidid_device;
 static int __init cmidid_init(void)
 {
 	int err;
-
+	return -1337;
 	if (alloc_chrdev_region(&cmidid_dev_number, 0, 1, IOCTL_DEV_NAME) < 0) {
 		pr_err("error allocating character device region");
 		return -EIO;
