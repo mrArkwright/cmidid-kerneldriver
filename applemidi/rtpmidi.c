@@ -116,7 +116,7 @@ int MIDIUtilWriteVarLen( MIDIVarLen * value, size_t size, unsigned char * buffer
   //MIDIPrecond( buffer != NULL && value != NULL, EINVAL );
   //MIDIPrecond( size > 0, EINVAL );
   
-  printk("RTPMIDI write varlen\n");
+  pr_debug("RTPMIDI write varlen\n");
 
   v = *value & 0x0fffffff;
   do {
@@ -134,7 +134,7 @@ int MIDIUtilWriteVarLen( MIDIVarLen * value, size_t size, unsigned char * buffer
 }
 
 static void _advance_buffer( size_t * size, void ** buffer, size_t bytes ) {
-	printk("RTPMIDI advance buffer\n");
+	pr_debug("RTPMIDI advance buffer\n");
   *size   -= bytes;
   *buffer += bytes;
 }
@@ -142,7 +142,7 @@ static void _advance_buffer( size_t * size, void ** buffer, size_t bytes ) {
 static int _rtpmidi_encode_header( struct RTPMIDIInfo * info, size_t size, void * data, size_t * written ) {
   unsigned char * buffer = data;
   
-  printk("RTPMIDI encoding header\n");
+  pr_debug("RTPMIDI encoding header\n");
   
   if( info->len > 0x0fff ) return 1;
   if( info->len > 0x0f ) {
@@ -173,29 +173,29 @@ static int _rtpmidi_encode_messages( struct RTPMIDIInfo * info, MIDITimestamp ti
   MIDITimestamp     timestamp2;
   MIDIVarLen        time_diff;
   
-  printk("RTPMIDI encoding message\n");
+  pr_debug("RTPMIDI encoding message\n");
 
   for( m=0; (size>0) && (messages!=NULL) && (messages->message!=NULL); m++ ) {
-	  printk("RTPMIDI encode message nr: %i\n",m);
+	  pr_debug("RTPMIDI encode message nr: %i\n",m);
     MIDIMessageGetTimestamp( messages->message, &timestamp2 );
-	printk("RTPMIDI got timestamp\n");
+	pr_debug("RTPMIDI got timestamp\n");
     time_diff = ( timestamp2 > timestamp ) ? ( timestamp2 - timestamp ) : 0;
     timestamp = timestamp2;
     if( m == 0 ) {
       info->zero = time_diff ? 1 : 0;
     }
     if( m > 0 || info->zero == 1 ) {
-		printk("RTPMIDI vor write varlen\n");
+		pr_debug("RTPMIDI vor write varlen\n");
       MIDIUtilWriteVarLen( &time_diff, size, buffer, &w );
-	  printk("RTPMIDI written varlen\n");
+	  pr_debug("RTPMIDI written varlen\n");
       _advance_buffer( &size, &buffer, w );
-	  printk("RTPMIDI advanced\n");
+	  pr_debug("RTPMIDI advanced\n");
     }
-	printk("RTPMIDI will get running status\n");
+	pr_debug("RTPMIDI will get running status\n");
     MIDIMessageEncodeRunningStatus( messages->message, &status, size, buffer, &w );
-	printk("RTPMIDI will advance buffer\n");
+	pr_debug("RTPMIDI will advance buffer\n");
     _advance_buffer( &size, &buffer, w );
-	printk("RTPMIDI advanced\n");
+	pr_debug("RTPMIDI advanced\n");
     messages = messages->next;
   }
 
@@ -236,7 +236,7 @@ int RTPMIDISessionSend( struct RTPMIDISession * session, struct MIDIMessageList 
 
   MIDIMessageGetTimestamp( messages->message, &timestamp );
   
-  printk("RTPMIDI timestamped message\n");
+  pr_debug("RTPMIDI timestamped message\n");
 
   info->peer            = 0;
   info->padding         = 0;
