@@ -1,3 +1,5 @@
+#define DEBUG
+
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -9,15 +11,21 @@
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
 
+
+
 #define TEMPLATE "new_midi" /* Name of module */
 #define LOGPREFIX "new_midi: "
 
 static dev_t template_dev_number;
 static struct cdev *driver_object;
-struct class *template_class;
+static struct class *template_class;
+static struct device *dev;
 
 struct snd_card *card;
 static int client = 0;
+
+static int myint = 1;
+module_param(myint, int, 0);
 
 void config_note(struct snd_seq_event *note, unsigned char notevalue, unsigned char velocity) {
 	if (notevalue <= 0)
@@ -110,6 +118,8 @@ void exit_midi(void) {
 int __init new_midi_init(void) {
 	printk(KERN_INFO LOGPREFIX "init\n");
 	
+	pr_info("myint: %d\n", myint);
+	
 	if (alloc_chrdev_region(&template_dev_number, 0, 1, TEMPLATE) < 0) return -EIO;
 	
 	driver_object = cdev_alloc();
@@ -121,7 +131,7 @@ int __init new_midi_init(void) {
 	
 	template_class = class_create(THIS_MODULE, TEMPLATE);
 	
-	device_create(template_class, NULL, template_dev_number, NULL, "%s", TEMPLATE);
+	dev = device_create(template_class, NULL, template_dev_number, NULL, "%s", TEMPLATE);
 	
 	return init_midi();
 	
