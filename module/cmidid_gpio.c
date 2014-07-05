@@ -76,11 +76,13 @@ static bool is_valid(int gpio)
 	int i;
 	for (i = 0; i < state.num_buttons; i++) {
 		if (gpio == state.buttons[i].gpio_start.gpio) {
-			dbg("GPIO: %d is invalid. It was already used...");
+			dbg("gpio: %d is invalid. It was already used...\n",
+			    gpio);
 			return false;
 		}
 		if (gpio == state.buttons[i].gpio_end.gpio) {
-			dbg("GPIO: %d is invalid. It was already used...");
+			dbg("gpio: %d is invalid. It was already used...\n",
+			    gpio);
 			return false;
 		}
 	}
@@ -102,7 +104,7 @@ int gpio_init(void)
 	}
 	/* Drop if array length is not a multiple of three. */
 	if (num_requested_gpios % 3 != 0) {
-		err("Unable to parse gpios/pitches. num_requested_gpios % 3 != 0\n", num_requested_gpios);
+		err("Unable to parse gpios/pitches. num_requested_gpios %% 3 != 0\n");
 		return -EINVAL;
 	}
 
@@ -119,6 +121,7 @@ int gpio_init(void)
 
 	for (i = 0; i < state.num_buttons; i++) {
 		err = -EINVAL;
+		state.buttons[i].id = i;
 		if (!is_valid(requested_gpios[3 * i])) {
 			err("Invalid gpio: %d\n", requested_gpios[3 * i]);
 			goto free_buttons;
@@ -133,7 +136,7 @@ int gpio_init(void)
 		state.buttons[i].gpio_end.flags = GPIO_MODE;
 		state.buttons[i].pitch = requested_gpios[3 * i + 2];
 		dbg("Setting button %d: gpio_start = %d, gpio_end = %d, "
-		    "pitch = %d\n", state.buttons[i].gpio_start.gpio,
+		    "pitch = %d\n", i, state.buttons[i].gpio_start.gpio,
 		    state.buttons[i].gpio_end.gpio, state.buttons[i].pitch);
 
 		if ((err =
@@ -150,6 +153,20 @@ int gpio_init(void)
 				      state.buttons[i].gpio_end.label)) < 0) {
 			err("%d. Could not request gpio %d.", err,
 			    state.buttons[i].gpio_end.gpio);
+			goto free_buttons;
+		}
+		if ((err =
+		     request_irq(state.buttons[i].irq_start, irq_handler,
+				 IRQ_TRIGGER, NULL, NULL)) < 0) {
+			err("Could not request irq for button %d.\n",
+			    state.buttons[i].id);
+			goto free_buttons;
+		}
+		if ((err =
+		     request_irq(state.buttons[i].irq_end, irq_handler,
+				 IRQ_TRIGGER, NULL, NULL)) < 0) {
+			err("Could not request irq for button %d.\n",
+			    state.buttons[i].id);
 			goto free_buttons;
 		}
 	}
