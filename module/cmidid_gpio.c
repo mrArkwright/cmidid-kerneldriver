@@ -24,8 +24,8 @@ static struct button {
 	int id;
 	struct gpio gpio_start;	/* GPIO port for first trigger. */
 	struct gpio gpio_end;	/* GPIO port for second trigger. */
-	int irq_start;
-	int irq_end;
+	unsigned int irq_start;
+	unsigned int irq_end;
 	s64 hit_time_start;
 	s64 release_time_start;
 	s64 hit_time_end;
@@ -156,6 +156,20 @@ int gpio_init(void)
 			goto free_buttons;
 		}
 
+		if ((err = gpio_to_irq(state.buttons[i].gpio_start.gpio)) < 0) {
+			err("Could not request irq for gpio %d.\n",
+			    state.buttons[i].gpio_start.gpio);
+			goto free_buttons;
+		}
+		state.buttons[i].irq_start = err;
+
+		if ((err = gpio_to_irq(state.buttons[i].gpio_end.gpio)) < 0) {
+			err("Could not request irq for gpio %d.\n",
+			    state.buttons[i].gpio_end.gpio);
+			goto free_buttons;
+		}
+		state.buttons[i].irq_end = err;
+
 		if ((err =
 		     request_irq(state.buttons[i].irq_start, irq_handler,
 				 IRQ_TRIGGER, "irq_start", NULL)) < 0) {
@@ -181,6 +195,12 @@ int gpio_init(void)
 
 void gpio_exit(void)
 {
+	int i;
 	dbg("GPIO component exiting...");
 	kfree(state.buttons);
+
+	for (i = 0; i < state.num_buttons; i++) {
+		free_irq(state.buttons[i].irq_start, NULL);
+		free_irq(state.buttons[i].irq_end, NULL);
+	}
 }
