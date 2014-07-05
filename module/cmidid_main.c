@@ -5,6 +5,7 @@
 #include <linux/device.h>
 
 #include "cmidid_main.h"
+#include "cmidid_ioctl.h"
 #include "cmidid_midi.h"
 #include "cmidid_gpio.h"
 
@@ -19,7 +20,7 @@ static void __exit cmidid_exit(void);
 module_init(cmidid_init);
 module_exit(cmidid_exit);
 
-static long cmidid_ioctl(struct file *, unsigned int, unsigned long);
+static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg);
 
 static struct file_operations cmidid_fops = {
 	.unlocked_ioctl = cmidid_ioctl,
@@ -108,6 +109,14 @@ static void __exit cmidid_exit(void)
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	dbg("`cmidid_ioctl' called with f=%p, cmd=%d, arg=%lu\n", f, cmd, arg);
+
+	switch (cmd) {
+	case CMIDID_CALIBRATE:
+		dbg("definitely calibrating now!\n");
+		break;
+	default:
+		dbg("unknown ioctl\n");
+	}
 
 	return 0;
 }

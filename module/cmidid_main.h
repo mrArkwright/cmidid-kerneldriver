@@ -8,13 +8,9 @@
 
 /***********************************************************************
  * ioctl Settings
- *
- * The device number (major) should be between 0 and 255.
- * I guess a large number is more likely to avoid clashes.
  **********************************************************************/
 
 #define IOCTL_DEV_NAME MODULE_NAME
-#define IOCTL_DEV_NUMBER 0xCC /* 204 */
 
 /***********************************************************************
  * Module parameter settings

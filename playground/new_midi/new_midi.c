@@ -11,6 +11,11 @@
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
 
+#include "new_midi.h"
+
+#define dbg(fmt, ...) \
+        pr_debug("newmidi: [%s:%d %s] Debug: " pr_fmt(fmt), \
+                        __FILE__, __LINE__, __func__, ##__VA_ARGS__)
 
 
 #define TEMPLATE "new_midi" /* Name of module */
@@ -65,9 +70,19 @@ static void send_note(unsigned char notevalue, unsigned char velocity) {
 }
 
 static long new_midi_ioctl(struct file *f, unsigned int cmd, unsigned long arg) {
-	printk(KERN_INFO LOGPREFIX "ioctl called\n");
+	dbg("`cmidid_ioctl' called with f=%p, cmd=%d, arg=%lu\n", f, cmd, arg);
 	
-	send_note(0x3b, 127);
+	switch (cmd) {
+	case NEWMIDI_BLA:
+		dbg("bla\n");
+		break;
+	case NEWMIDI_BLUPP:
+		dbg("blupp\n");
+		send_note(0x3b, 127);
+		break;
+	default:
+		dbg("didnt work\n");
+	}
 	
 	return 0;
 }
