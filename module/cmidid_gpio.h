@@ -18,7 +18,7 @@
  * IRQF_TRIGGER_RISING, IRQF_TRIGGER_FALLING, IRQF_TRIGGER_HIGH, etc.
  * Take a look at the defined values in `linux/interrupt.h'.
  */
-#define IRQ_TRIGGER IRQF_TRIGGER_RISING
+#define IRQ_TRIGGER IRQF_TRIGGER_RISING|IRQF_TRIGGER_FALLING
 
 /*
  * The startup routine for the GPIO component of the module.
