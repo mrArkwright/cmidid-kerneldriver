@@ -16,6 +16,7 @@ static dev_t template_dev_number;
 static struct cdev *driver_object;
 struct class *template_class;
 
+struct snd_card *card;
 static int client = 0;
 
 void config_note(struct snd_seq_event *note, unsigned char notevalue, unsigned char velocity) {
@@ -69,7 +70,6 @@ static struct file_operations new_midi_fops = {
 
 static int init_midi(void) {
 	int err;
-	struct snd_card *card;
 	struct snd_seq_port_info *pinfo;
 	
 	err = snd_card_create(-1, NULL, THIS_MODULE, sizeof(struct snd_card), &card);
@@ -102,9 +102,12 @@ static int init_midi(void) {
 	return 0;
 }
 
+void exit_midi(void) {
+	snd_seq_delete_kernel_client(client);
+	snd_card_free(card);
+}
+
 int __init new_midi_init(void) {
-	int err;
-	
 	printk(KERN_INFO LOGPREFIX "init\n");
 	
 	if (alloc_chrdev_region(&template_dev_number, 0, 1, TEMPLATE) < 0) return -EIO;
@@ -130,6 +133,8 @@ free_device_number:
 }
 
 void __exit new_midi_exit(void) {
+	exit_midi();
+	
 	printk(KERN_INFO LOGPREFIX "exit\n");
 	
 	/* Delete Sysfs entry and device file  */
