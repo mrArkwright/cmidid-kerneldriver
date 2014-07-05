@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/ip.h>
 #include <linux/inet.h>
 #include <linux/time.h>
@@ -6,6 +7,8 @@
 #include <net/sock.h>
 
 #include <linux/slab.h>
+
+#include <linux/spinlock.h>
 
 #include "applemidi.h"
 
@@ -432,11 +435,21 @@ static void _socket_callback(struct sock *sk, int bytes)
 			if( _test_applemidi((u16 *)(skb->data+8),length-8) == 0 )
 			{
 				pr_debug("is applemidi message\n");
-				if( _applemidi_recv_command( driver, skb , &(driver->command) ) == 0)
-				{
-					pr_debug("reply to command\n");
-					_applemidi_respond( driver, sk,  &(driver->command) );
-				}
+				//test if possible now:
+                if(spin_trylock(&(driver->lock)))
+                {
+                    pr_debug("allowed (lock not taken)\n")
+                    if( _applemidi_recv_command( driver, skb , &(driver->command) ) == 0)
+    				{
+    					pr_debug("reply to command\n");
+    					_applemidi_respond( driver, sk,  &(driver->command) );
+    				}
+                    spin_unlock(&(driver->lock));
+                }
+                else
+                {
+                    pr_warn("dropped packet because of sending note\n");
+                }
 			}
 			else if(driver->rtp_socket->sk == sk)
 			{
@@ -577,17 +590,25 @@ void _applemidi_idle_timeout( unsigned long data) {
 //
 // _applemidi_update_runloop_source( driver );
 //
-	RTPSessionNextPeer( driver->rtp_session, &(driver->peer) );
-	if( driver->peer != NULL ) {
-      /* check if receiver feedback needs to be sent */
-      if( driver->sync == 0 ) {
-        /* no sync packets active. start new sync */
-        RTPPeerGetAddress( driver->peer, &size, &addr );
-		//addr_in=(struct sockaddr_in *)addr;
-		pr_debug("start sync with client: %pI4\n",&addr->sin_addr.s_addr);
-        _applemidi_start_sync( driver, driver->rtp_socket->sk, size, addr );
-      	//no return
-	  }
+    if(spin_trylock(&(driver->lock)))
+    {
+    	RTPSessionNextPeer( driver->rtp_session, &(driver->peer) );
+    	if( driver->peer != NULL ) {
+          /* check if receiver feedback needs to be sent */
+          if( driver->sync == 0 ) {
+            /* no sync packets active. start new sync */
+            RTPPeerGetAddress( driver->peer, &size, &addr );
+    		//addr_in=(struct sockaddr_in *)addr;
+    		pr_debug("start sync with client: %pI4\n",&addr->sin_addr.s_addr);
+            _applemidi_start_sync( driver, driver->rtp_socket->sk, size, addr );
+          	//no return
+    	  }
+        }
+        spin_unlock(&(driver->lock));
+    }
+    else
+    {
+        pr_warn("could not so sync timeout because of midi event\n");
     }
 //
 // /* check for messages in dispatch (incoming) queue:
@@ -617,6 +638,8 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 		return NULL;
 	}
 	pr_debug("placed driver at %p\n",driver);
+    
+    spin_lock_init(&(driver->lock));
 
 	pr_debug("allocated driver structure\n");
 	MIDIDriverInit(&(driver->base), name, APPLEMIDI_CLOCK_RATE,(void *)driver);
@@ -683,9 +706,12 @@ void MIDIDriverAppleMIDIDestroy(struct MIDIDriverAppleMIDI *driver)
 
 static int __init mod_init(void)
 {
-	
+	int port=5008;
+    
+    module_param(port, int, 0);
+    
 	pr_info("initializing applemidi\n");
-	raspi = MIDIDriverAppleMIDICreate("kernel", 5008);
+	raspi = MIDIDriverAppleMIDICreate("kernel", port);
 	if (raspi == NULL) {
 		return 1;
 	}
