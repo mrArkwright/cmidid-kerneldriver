@@ -1,35 +1,47 @@
+#define DEBUG
 #include <linux/gpio.h>
+#include <linux/slab.h>
+#include <linux/stat.h>
 #include <linux/interrupt.h>
+#include <linux/moduleparam.h>
 
 #include "cmidid_main.h"
 #include "cmidid_gpio.h"
 #include "cmidid_midi.h"
 
-struct gpio gpios[NUM_GPIOS];
+#define MAX_REQUEST 128
 
-struct button buttons[ARRAY_SIZE(gpios)];
-
-int irqs[ARRAY_SIZE(gpios)];
-
-int button_map[ARRAY_SIZE(gpios)];
-
-module_param_array(button_map, int, NULL, 0);
-MODULE_PARM_DESC(button_map, "Mapping from GPIO numbers to logical keyboard "
-		 "buttons. The GPIO port i will be mapped to the logical "
-		 "button button_map[i].");
+static const int valid_gpios = { 4, 22 };
 
 /*
- * The minimum time interval that has to pass before a button hit_time
- * for a single button is updated. This should probably be within
- * millisecond range.
- *
- * Unfortunately, 64 Byte types are not supported as module parameters.
+ * GPIOs requested via kernel parameter.
+ * This is a simple list of gpio ids with an corresponding pitch.
  */
-static int hit_time_threshold;
+int requested_gpios[MAX_REQUEST];
+int num_requested_gpios;
+module_param_array(requested_gpios, int, &num_requested_gpios, 0);
+MODULE_PARM_DESC(requested_gpios, "Ids for the required gpios.");
 
-module_param(hit_time_threshold, int, PARM_VIS_FLAGS);
-MODULE_PARM_DESC(hit_time_threshold, "Minimum time (in ns) between two "
-		 "registered key hits.");
+static struct button {
+	int id;
+	struct gpio gpio_start;	/* GPIO port for first trigger. */
+	struct gpio gpio_end;	/* GPIO port for second trigger. */
+	int irq_start;
+	int irq_end;
+	s64 hit_time_start;
+	s64 release_time_start;
+	s64 hit_time_end;
+	s64 release_time_end;
+	int pitch;
+	int notevelocity;
+};
+
+static struct cmidid_gpio_state {
+	struct button *buttons;
+	int num_buttons;
+};
+
+static struct cmidid_gpio_state state;
 
 /*
  * Returns the index of a given irq value in the irqs array.
@@ -37,12 +49,14 @@ MODULE_PARM_DESC(hit_time_threshold, "Minimum time (in ns) between two "
  * Unfortunatly the function `int irq_to_gpio(int irq)'
  * in linux/gpio.h didn't work for me.
  */
-static int get_irq_index(int irq)
+static struct gpio *irq_to_gpio(int irq)
 {
 	int i;
-	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		if (irqs[i] == irq)
-			return i;
+	for (i = 0; i < state.num_buttons; i++) {
+		if (state.buttons[i].irq_start == irq)
+			return &state.buttons[i].gpio_start;
+		if (state.buttons[i].irq_end == irq)
+			return &state.buttons[i].gpio_end;
 	}
 	return -EINVAL;
 }
@@ -52,59 +66,48 @@ static int get_irq_index(int irq)
  */
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
-	int gpio = irq_to_gpio(irq);
+	info("Interrupt handler called %d: %p.\n", irq, dev_id);
+
+	send_note(70, 100);
 
 	return IRQ_HANDLED;
 }
 
 int gpio_init(void)
 {
-	int i, ret;
-	char gpio_name[8];
-
-	size_t num_gpios = ARRAY_SIZE(gpios);
+	int i, err;
 
 	info("GPIO component initializing...\n");
-	info("Using %lu GPIOs: 0 - %lu\n", num_gpios, num_gpios - 1);
+	info("%d GPIOs requested.", num_requested_gpios);
 
-	/* Initialize the gpios array. */
-	for (i = 0; i < num_gpios; i++) {
-		snprintf(gpio_name, ARRAY_SIZE(gpio_name), "GPIO %02d", i);
-		gpios[i] = (struct gpio) {
-		.gpio = i,.flags = GPIO_MODE,.label = gpio_name,};
+	/* Drop if the array length is invalid. */
+	if ((err = num_requested_gpios) <= 0) {
+		err("Unable to request gpio. num_requested_gpios = %d\n", err);
+		return -EINVAL;
+	}
+	/* Drop if array length is not a multiple of three. */
+	if (num_requested_gpios % 3 != 0) {
+		err("Unable to parse gpios/pitches. num_requested_gpios % 3 != 0\n", num_requested_gpios);
+		return -EINVAL;
 	}
 
-	/* Initialize the irqs and irq_times arrays. */
-	for (i = 0; i < ARRAY_SIZE(irqs); i++)
-		irqs[i] = -1;
+	/* Allocate one button struct for every pair of gpios with pitch. */
+	state.num_buttons = num_requested_gpios / 3;
+	state.buttons =
+	    kzalloc(state.num_buttons * sizeof(struct button), GFP_KERNEL);
 
-	return 0;
-
-	/* Request an array of GPIOs. */
-	if ((ret = gpio_request_array(gpios, ARRAY_SIZE(gpios)))) {
-		err("%d. Unable to request GPIOs for 'gpios' array.", ret);
-		return ret;
+	if ((err = state.buttons) == NULL) {
+		err("%d. Could not allocate space state.buttons.", err);
+		return err;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(gpios); i++) {
-		/* Request IRQs for every GPIO port. */
-		if ((ret = gpio_to_irq(gpios[i].gpio)) < 0) {
-			err("%d. Unable to request IRQ for gpio: %d\n",
-			    ret, gpios[i].gpio);
-			return ret;
-		}
-		info("Setting IRQ %d for gpio %d\n", ret, gpios[i].gpio);
-		irqs[i] = ret;
-		/* Set the interrupt service routine for every port. */
-		/* Add IRQF_TRIGGER_FALLING or IRQF_TRIGGER_RISING. */
-		ret = request_irq(irqs[i], irq_handler,
-				  IRQF_TRIGGER_FALLING |
-				  IRQF_DISABLED, gpios[i].label, 0);
-		if (ret) {
-			err("%d. Unable to request IRQ for port %d\n", ret,
-			    gpios[i].gpio);
-			return ret;
-		}
+	for (i = 0; i < state.num_buttons; i++) {
+		state.buttons[i].gpio_start.gpio = requested_gpios[3 * i];
+		state.buttons[i].gpio_end.gpio = requested_gpios[3 * i + 1];
+		state.buttons[i].pitch = requested_gpios[3 * i + 2];
+		info("Setting button %d: gpio_start = %d, gpio_end = %d, "
+		     "pitch = %d\n", state.buttons[i].gpio_start,
+		     state.buttons[i].gpio_end, state.buttons[i].pitch);
 	}
 
 	return 0;
@@ -112,10 +115,6 @@ int gpio_init(void)
 
 void gpio_exit(void)
 {
-	int i;
-	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		free_irq(irqs[i], 0);
-	}
-	gpio_free_array(gpios, ARRAY_SIZE(gpios));
-
+	info("GPIO component exiting...");
+	kfree(state.buttons);
 }
