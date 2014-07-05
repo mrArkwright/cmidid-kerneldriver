@@ -74,7 +74,7 @@ struct RTPPeer * RTPPeerCreate( unsigned long ssrc, int size, struct sockaddr_in
   peer->address.ssrc = ssrc;
   peer->address.size = size;
   memcpy( &(peer->address.addr), addr, sizeof(struct sockaddr_in) );
-  printk("added RTP client %pI4:%d\n",&peer->address.addr.sin_addr.s_addr,peer->address.addr.sin_port);
+  pr_info("added RTP client %pI4:%d\n",&peer->address.addr.sin_addr.s_addr,peer->address.addr.sin_port);
   peer->in_seqnum      = 0;
   peer->in_timestamp   = 0;
   peer->out_seqnum     = 0;
@@ -339,7 +339,7 @@ static int _rtp_encode_header( struct RTPPacketInfo * info, size_t size, void * 
   unsigned char * buffer = data;
   size_t header_size = 12 + ( info->csrc_count * 4 );
   
-  printk("RTP encode header\n");
+  pr_debug("RTP encode header\n");
 
   if( size < header_size ) return 1;
     
@@ -380,7 +380,7 @@ static int _rtp_encode_extension( struct RTPPacketInfo * info, size_t size, void
   unsigned char * buffer = data;
   size_t ext_header_size;
   
-  printk("RTP encode extension\n");
+  pr_debug("RTP encode extension\n");
   
   if( info->extension ) {
     if( info->iovlen < 1 ) return 1;
@@ -405,7 +405,7 @@ static int _rtp_encode_extension( struct RTPPacketInfo * info, size_t size, void
 static int _rtp_encode_padding( struct RTPPacketInfo * info, size_t size, void * data, size_t * written ) {
   unsigned char * buffer = data;
   
-  printk("RTP encode padding\n");
+  pr_debug("RTP encode padding\n");
   
   if( info->padding ) {
     if( size < info->padding ) return 1;
@@ -416,13 +416,13 @@ static int _rtp_encode_padding( struct RTPPacketInfo * info, size_t size, void *
 }
 
 static void _advance_buffer( size_t * size, void ** buffer, size_t bytes ) {
-	printk("RTP advance buf\n");
+	pr_debug("RTP advance buf\n");
   *size   -= bytes;
   *buffer += bytes;
 }
 
 static void _append_iov( size_t * iovlen, struct iovec * iov, size_t size, void * buffer ) {
-	printk("RTP append iov\n");
+	pr_debug("RTP append iov\n");
   iov[*iovlen].iov_len  = size;
   iov[*iovlen].iov_base = buffer;
   *iovlen += 1;
@@ -448,7 +448,7 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
   
   mm_segment_t oldfs;
   
-  printk("RTP send message\n");
+  pr_debug("RTP send message\n");
   
   if( info == NULL || info->peer == NULL ) return 1;
   if( info->iovlen > RTP_IOV_LEN ) return 1;
@@ -483,16 +483,16 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
     info->total_size += written;
   }
 
-  printk("RTP Sending RTP message consisting of %i iovecs.\n", (int) iovlen );
+  pr_debug("RTP Sending RTP message consisting of %i iovecs.\n", (int) iovlen );
   int i, j;
   for( i=0; i<iovlen; i++ ) {
-    printk("[%i] iov_len: %i, iov_base: %p\n", i, (int) iov[i].iov_len, iov[i].iov_base );
+    pr_debug("[%i] iov_len: %i, iov_base: %p\n", i, (int) iov[i].iov_len, iov[i].iov_base );
     for( j=0; j<iov[i].iov_len; j++ ) {
       unsigned char c = *((unsigned char*)iov[i].iov_base+j);
       if( (j+1) % 8 == 0 || j+1 == iov[i].iov_len ) {
-        printk("0x%02x\n", c );
+        pr_debug("0x%02x\n", c );
       } else {
-        printk("0x%02x ", c );
+        pr_debug("0x%02x ", c );
       }
     }
   }
@@ -502,7 +502,7 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
 	//to.sin_addr.s_addr = a->sin_addr.s_addr;
 	//to.sin_port=a->sin_port;
   a = &(info->peer->address.addr);
-  printk("send %i bytes to %pI4:%i on s(%p)\n", info->total_size, &a->sin_addr.s_addr, ntohs(a->sin_port ), session->socket->sk );
+  pr_debug("send %i bytes to %pI4:%i on s(%p)\n", info->total_size, &a->sin_addr.s_addr, ntohs(a->sin_port ), session->socket->sk );
 
   msg.msg_name       =  &(info->peer->address.addr);
   msg.msg_namelen    = info->peer->address.size;
@@ -520,7 +520,7 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
 	set_fs(oldfs);
   //bytes_sent = sendmsg( session->socket, &msg, 0 );
 	
-	printk("RTP bytes sent: %i of %i\n",bytes_sent,info->total_size);
+	pr_debug("RTP bytes sent: %i of %i\n",bytes_sent,info->total_size);
 
   if( bytes_sent != info->total_size ) {
     return bytes_sent;

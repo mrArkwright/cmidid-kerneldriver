@@ -39,7 +39,7 @@ _alsa_input(struct snd_seq_event *ev, int direct, void *private_data,
 	    int atomic, int hop)
 {
 	struct privateData *data= (struct privateData *)private_data;
-	printk("callback from alsa received of type %d\n",ev->type);
+	pr_debug("callback from alsa received of type %d\n",ev->type);
 	
 	//data->list[0].message=;
     
@@ -64,7 +64,7 @@ _alsa_input(struct snd_seq_event *ev, int direct, void *private_data,
 	data->msg.data.size=3;
 	data->msg.data.data=NULL;
 	data->msg.format=MIDIMessageFormatDetect(&(data->msg.data.bytes[0]));
-	printk("found format\n");
+	pr_debug("found format\n");
 	data->msg.timestamp=0;
 		
 	
@@ -85,7 +85,7 @@ _create_port(int my_client, int idx, int type, void *drv)
 	struct snd_seq_port_info pinfo;
 	struct snd_seq_port_callback pcb;
 	
-	printk("register alsa port\n");
+	pr_debug("register alsa port\n");
 	//struct snd_seq_dummy_port *rec;
 
 	/*if ((rec = kzalloc(sizeof(*rec), GFP_KERNEL)) == NULL)
@@ -120,7 +120,7 @@ _create_port(int my_client, int idx, int type, void *drv)
 	pinfo.kernel = &pcb;
 	if (snd_seq_kernel_client_ctl(my_client, SNDRV_SEQ_IOCTL_CREATE_PORT, &pinfo) < 0) {
 		//kfree(rec);
-		printk("could not register port\n");
+		pr_err("could not register port\n");
 		return -1;
 	}
 	//rec->port = pinfo.addr.port;
@@ -160,7 +160,7 @@ ALSARegisterClient(void * drv)
 	
 	err = snd_card_create(-1, NULL, THIS_MODULE, sizeof(struct snd_card), &(driver->card));
 	if (err < 0) {
-		printk("alsa error creating card: %d\n", err);
+		pr_err("alsa error creating card: %d\n", err);
 		goto fail_card;
 	}
 	
@@ -175,14 +175,14 @@ ALSARegisterClient(void * drv)
 						 "AppleMidi");
 	if (driver->client < 0)
 	{	
-		printk("failed to register alsa client : %d\n",driver->client);
+		pr_err("failed to register alsa client : %d\n",driver->client);
 		goto fail_client;
 	}
 	
 	
 	/* create ports */
 	//for (i = 0; i < ports; i++) {
-	printk("register alsa port\n");
+	pr_debug("register alsa port\n");
 	ret = _create_port(driver->client, 0, 0, driver->priv);
 	if (ret < 0) {
 		//snd_seq_delete_kernel_client(driver->client);
@@ -200,16 +200,16 @@ ALSARegisterClient(void * drv)
 	//	}
 	//}
 	
-	printk("registering snd card\n");
+	pr_debug("registering snd card\n");
 	err = snd_card_register(driver->card);
 	if (err < 0) {
-		printk("failed to register card:err:%d\n",err);
+		pr_err("failed to register card:err:%d\n",err);
 		goto fail_port;
 		//  snd_card_free(driver->card);
         //return NULL;
     }
 	
-	printk("registered alsa client\n");
+	pr_debug("registered alsa client\n");
 	
 	return driver;
 	
@@ -251,6 +251,6 @@ ALSADeleteClient(struct ALSADriver *driver)
 		kfree(driver->priv);
 	}
 	kfree(driver);	
-	printk("freed alsa port\n");
+	pr_debug("freed alsa port\n");
 }
 

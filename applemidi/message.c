@@ -229,7 +229,7 @@ struct MIDIMessageFormat * MIDIMessageFormatDetect( void * buffer ) {
   for( i=0; i<N_ELEM(formats); i++ ) {
     //MIDIAssert( formats[i] != NULL && formats[i]->test != NULL );
     if( (formats[i]->test)( buffer ) ) {
-		printk("detected format %i\n",i);
+		pr_debug("detected format %i\n",i);
       return formats[i];
     }
   }
@@ -256,21 +256,21 @@ int MIDIMessageFormatEncodeRunningStatus( struct MIDIMessageFormat * format, str
   //MIDIAssert( format->encode != NULL );
 	if(format != NULL)
 	{
-		printk("MSG Enc running status format !NULL");
+		pr_debug("MSG Enc running status format !NULL");
 		if(format->encode != NULL)
 		{
-			printk("MSG Enc running status format->enc !NULL");
+			pr_debug("MSG Enc running status format->enc !NULL");
 		  return (format->encode)( data, status, size, buffer, written );
 	  	}
 		else
 		{
-			printk("MSG Enc running status format->end NULL");
+			pr_warn("MSG Enc running status format->end NULL");
 			return 1;
 		}
 	}
 	else
 	{
-		printk("MSG Enc running status format NULL");
+		pr_warn("MSG Enc running status format NULL");
 		return 1;
 	}
 }

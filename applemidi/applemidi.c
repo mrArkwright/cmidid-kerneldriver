@@ -64,7 +64,7 @@ static int _applemidi_send_command( struct MIDIDriverAppleMIDI * driver, struct 
         } else {
           len  = 16;
         }
-		printk("built session packet, ready to send\n");
+		pr_debug("built session packet, ready to send\n");
         break;
       case APPLEMIDI_COMMAND_SYNCHRONIZATION:
         ssrc   = command->data.sync.ssrc;
@@ -90,7 +90,7 @@ static int _applemidi_send_command( struct MIDIDriverAppleMIDI * driver, struct 
 
   if( command->addr.sin_family == AF_INET ) {
      a = (struct sockaddr_in *) &(command->addr);
-    printk("send %i bytes to %pI4:%i on s(%p)\n", len, &a->sin_addr, ntohs(a->sin_port ), sk );
+    pr_debug("send %i bytes to %pI4:%i on s(%p)\n", len, &a->sin_addr, ntohs(a->sin_port ), sk );
   	
 	
 	memset(&to, 0, sizeof(to));
@@ -109,12 +109,12 @@ static int _applemidi_send_command( struct MIDIDriverAppleMIDI * driver, struct 
 	if(driver->control_socket->sk==sk)
 	{
 		source=driver->control_socket;
-		printk("send by control socket\n");
+		pr_debug("send by control socket\n");
 	}
 	else if(driver->rtp_socket->sk==sk)
 	{
 		source=driver->rtp_socket;
-		printk("send by rtp socket\n");
+		pr_debug("send by rtp socket\n");
 	}
 	if(source!=NULL){
 		oldfs = get_fs();
@@ -123,7 +123,7 @@ static int _applemidi_send_command( struct MIDIDriverAppleMIDI * driver, struct 
 		set_fs(oldfs);
 	}
 	
-	printk("sent %d of %d bytes\n",sentbytes,len);
+	pr_debug("sent %d of %d bytes\n",sentbytes,len);
 	
   	if( sentbytes != len ) {
     	return 1;
@@ -176,12 +176,12 @@ static int _applemidi_recv_command( struct MIDIDriverAppleMIDI * driver, struct 
 	sp= (unsigned short *)(skb->data);
 	command->addr.sin_port = *sp;
 	
-	printk("received pkt from %pI4:%d\n",&command->addr.sin_addr.s_addr,ntohs(*sp));
+	pr_debug("received pkt from %pI4:%d\n",&command->addr.sin_addr.s_addr,ntohs(*sp));
 	for(i=0;i<16;i++)
 	{
-		printk("%x ",msg[i]);
+		pr_debug("%x ",msg[i]);
 	}
-	printk("\n");
+	pr_debug("\n");
 	
   	command->type = ntohl( msg[0] ) & 0xffff;
   	
@@ -204,7 +204,7 @@ static int _applemidi_recv_command( struct MIDIDriverAppleMIDI * driver, struct 
         }
         ssrc = command->data.session.ssrc;
 		
-		printk("found session pkt: %c%c , ver:%lu,token:%lu,ssrc:%lu, name:%s\n",command->type >> 8, command->type & 0xff, command->data.session.version, command->data.session.token, command->data.session.ssrc, command->data.session.name);
+		pr_debug("found session pkt: %c%c , ver:%lu,token:%lu,ssrc:%lu, name:%s\n",command->type >> 8, command->type & 0xff, command->data.session.version, command->data.session.token, command->data.session.ssrc, command->data.session.name);
         break;
       case APPLEMIDI_COMMAND_SYNCHRONIZATION:
         if( len != 36 ) return 1;
@@ -217,7 +217,7 @@ static int _applemidi_recv_command( struct MIDIDriverAppleMIDI * driver, struct 
         command->data.sync.timestamp3  = (unsigned long long) ntohl( msg[7] ) << 32;
         command->data.sync.timestamp3 += ntohl( msg[8] );
         ssrc = command->data.sync.ssrc;
-		printk("found sync pkt: %c%c , ssrc:%lu, cnt=%lu, t1=%llu, t2=%llu, t3=%llu \n",command->type >> 8, command->type & 0xff,command->data.sync.ssrc,command->data.sync.count,command->data.sync.timestamp1,command->data.sync.timestamp2,command->data.sync.timestamp3);
+		pr_debug("found sync pkt: %c%c , ssrc:%lu, cnt=%lu, t1=%llu, t2=%llu, t3=%llu \n",command->type >> 8, command->type & 0xff,command->data.sync.ssrc,command->data.sync.count,command->data.sync.timestamp1,command->data.sync.timestamp2,command->data.sync.timestamp3);
         break;
       case APPLEMIDI_COMMAND_RECEIVER_FEEDBACK:
         if( len != 12 ) return 1;
@@ -246,7 +246,7 @@ static int _applemidi_sync( struct MIDIDriverAppleMIDI * driver, struct sock *sk
   MIDITimestamp timestamp, diff;
   RTPSessionGetSSRC( driver->rtp_session, &ssrc );
   MIDIClockGetNow( driver->base.clock, &timestamp );
-  printk("got timestamp %lld\n",timestamp);
+  pr_debug("got timestamp %lld\n",timestamp);
   if( command->type != APPLEMIDI_COMMAND_SYNCHRONIZATION || 
       command->data.sync.ssrc == ssrc ||
       command->data.sync.count > 2 ) {
@@ -344,7 +344,7 @@ static int _applemidi_respond( struct MIDIDriverAppleMIDI * driver, struct sock 
         command->type = APPLEMIDI_COMMAND_INVITATION_REJECTED;
       }
       RTPSessionGetSSRC( driver->rtp_session, &(command->data.session.ssrc) );
-	  printk("processed invitation should now answer\n");
+	  pr_debug("processed invitation should now answer\n");
       return _applemidi_send_command( driver, sk, command );
     /*case APPLEMIDI_COMMAND_INVITATION_ACCEPTED:
       if( command->data.session.token == driver->token ) {
@@ -419,7 +419,7 @@ static void _socket_callback(struct sock *sk, int bytes)
 	
 	struct sk_buff *skb;
 	
-	printk("received %d bytes\n", bytes);
+	pr_debug("received %d bytes\n", bytes);
 	
 	len = skb_queue_len(&sk->sk_receive_queue);
 	while (len > 0) {
@@ -431,10 +431,10 @@ static void _socket_callback(struct sock *sk, int bytes)
 		{
 			if( _test_applemidi((u16 *)(skb->data+8),length-8) == 0 )
 			{
-				printk("is applemidi message\n");
+				pr_debug("is applemidi message\n");
 				if( _applemidi_recv_command( driver, skb , &(driver->command) ) == 0)
 				{
-					printk("reply to command\n");
+					pr_debug("reply to command\n");
 					_applemidi_respond( driver, sk,  &(driver->command) );
 				}
 			}
@@ -457,7 +457,7 @@ static int _applemidi_connect(struct MIDIDriverAppleMIDI *driver)
 	int result = 0;
 
 	if (driver->control_socket == NULL) {
-		printk("connect control\n");
+		pr_debug("connect control\n");
 		addr.sin_family = AF_INET;
 		addr.sin_addr.s_addr = INADDR_ANY;
 		addr.sin_port = htons(driver->port);
@@ -465,7 +465,7 @@ static int _applemidi_connect(struct MIDIDriverAppleMIDI *driver)
 		if (sock_create
 		    (PF_INET, SOCK_DGRAM, IPPROTO_UDP,
 		     &driver->control_socket) < 0) {
-			printk(KERN_ERR
+			pr_err(KERN_ERR
 			       "server: Error creating controlsocket\n");
 			return -EIO;
 		}
@@ -479,7 +479,7 @@ static int _applemidi_connect(struct MIDIDriverAppleMIDI *driver)
 		
 		driver->control_socket->sk->sk_data_ready = _socket_callback;
 		
-		printk("control ready\n");
+		pr_debug("control ready\n");
 	}
 	if (driver->rtp_socket == NULL) {
 		addr.sin_family = AF_INET;
@@ -489,7 +489,7 @@ static int _applemidi_connect(struct MIDIDriverAppleMIDI *driver)
 		if (sock_create
 		    (PF_INET, SOCK_DGRAM, IPPROTO_UDP,
 		     &driver->rtp_socket) < 0) {
-			printk(KERN_ERR "server: Error creating datasocket\n");
+			pr_err(KERN_ERR "server: Error creating datasocket\n");
 			goto control_fail;
 		}
 		result =
@@ -501,7 +501,7 @@ static int _applemidi_connect(struct MIDIDriverAppleMIDI *driver)
 		}
 		
 		driver->rtp_socket->sk->sk_data_ready = _socket_callback;
-		printk("rtp ready\n");
+		pr_debug("rtp ready\n");
 	}
 
 	return result;
@@ -549,7 +549,7 @@ _applemidi_disconnect(struct MIDIDriverAppleMIDI *driver, struct socket *sock)
 		if (driver->control_socket != NULL) {
 			sock_release(driver->control_socket);
 			driver->control_socket = NULL;
-			printk("control released\n");
+			pr_debug("control released\n");
 		}
 	}
 	if (sock == driver->rtp_socket || sock == NULL) {
@@ -558,7 +558,7 @@ _applemidi_disconnect(struct MIDIDriverAppleMIDI *driver, struct socket *sock)
 		if (driver->rtp_socket != NULL) {
 			sock_release(driver->rtp_socket);
 			driver->rtp_socket = NULL;
-			printk("rtp released\n");
+			pr_debug("rtp released\n");
 		}
 	}
 	return 0;
@@ -569,7 +569,7 @@ void _applemidi_idle_timeout( unsigned long data) {
   int size;
 	
 	// void * drv, struct timespec * ts 
-	//printk("====called timeout (%ld) dat: %x ====\n",jiffies,data);
+	//pr_debug("====called timeout (%ld) dat: %x ====\n",jiffies,data);
 	struct MIDIDriverAppleMIDI * driver = (struct MIDIDriverAppleMIDI *) data;
 	mod_timer( &driver->timer, jiffies + msecs_to_jiffies(1500) );
 	
@@ -584,7 +584,7 @@ void _applemidi_idle_timeout( unsigned long data) {
         /* no sync packets active. start new sync */
         RTPPeerGetAddress( driver->peer, &size, &addr );
 		//addr_in=(struct sockaddr_in *)addr;
-		printk("start sync with client: %pI4\n",&addr->sin_addr.s_addr);
+		pr_debug("start sync with client: %pI4\n",&addr->sin_addr.s_addr);
         _applemidi_start_sync( driver, driver->rtp_socket->sk, size, addr );
       	//no return
 	  }
@@ -616,9 +616,9 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 	if (driver == NULL) {
 		return NULL;
 	}
-	printk("placed driver at %p\n",driver);
+	pr_debug("placed driver at %p\n",driver);
 
-	printk("allocated driver structure\n");
+	pr_debug("allocated driver structure\n");
 	MIDIDriverInit(&(driver->base), name, APPLEMIDI_CLOCK_RATE,(void *)driver);
 
 	driver->control_socket = NULL;
@@ -627,6 +627,7 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 	driver->accept = 0xff;
 	driver->sync = 0;
 	strncpy(&(driver->name[0]), name, sizeof(driver->name));
+    driver->name[31]=0;
 
 	//driver->in_queue = MIDIMessageQueueCreate();
 	//driver->out_queue = MIDIMessageQueueCreate();
@@ -636,7 +637,7 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 
 	_applemidi_connect(driver);
 
-	printk("connected sockets\n");
+	pr_debug("connected sockets\n");
 
 	
 	driver->peer = NULL; 
@@ -645,7 +646,7 @@ struct MIDIDriverAppleMIDI *MIDIDriverAppleMIDICreate(char *name,
 	
 	MIDIClockGetNow(driver->base.clock, &timestamp); 
 	
-	printk("init timestamp with %lld\n",timestamp);
+	pr_debug("init timestamp with %lld\n",timestamp);
 	
 	driver->token = timestamp;
 	
@@ -683,7 +684,7 @@ void MIDIDriverAppleMIDIDestroy(struct MIDIDriverAppleMIDI *driver)
 static int __init mod_init(void)
 {
 	
-	printk("initializing applemidi\n");
+	pr_info("initializing applemidi\n");
 	raspi = MIDIDriverAppleMIDICreate("kernel", 5008);
 	if (raspi == NULL) {
 		return 1;
@@ -696,7 +697,7 @@ static void __exit mod_exit(void)
 	if (raspi) {
 		MIDIDriverAppleMIDIDestroy(raspi);
 	}
-	printk("leaving applemidi\n");
+	pr_info("leaving applemidi\n");
 }
 
 module_init(mod_init);
