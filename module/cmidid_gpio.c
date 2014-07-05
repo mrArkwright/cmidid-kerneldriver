@@ -11,8 +11,6 @@
 
 #define MAX_REQUEST 128
 
-static const int valid_gpios = { 4, 22 };
-
 /*
  * GPIOs requested via kernel parameter.
  * This is a simple list of gpio ids with an corresponding pitch.
@@ -49,7 +47,7 @@ static struct cmidid_gpio_state state;
  * Unfortunatly the function `int irq_to_gpio(int irq)'
  * in linux/gpio.h didn't work for me.
  */
-static struct gpio *irq_to_gpio(int irq)
+static struct gpio *get_irq_to_gpio(int irq)
 {
 	int i;
 	for (i = 0; i < state.num_buttons; i++) {
@@ -73,12 +71,29 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static bool is_valid(int gpio)
+{
+	int i;
+	for (i = 0; i < state.num_buttons; i++) {
+		if (gpio == state.buttons[i].gpio_start.gpio) {
+			dbg("GPIO: %d is invalid. It was already used...");
+			return false;
+		}
+		if (gpio == state.buttons[i].gpio_end.gpio) {
+			dbg("GPIO: %d is invalid. It was already used...");
+			return false;
+		}
+	}
+
+	return gpio_is_valid(gpio);
+}
+
 int gpio_init(void)
 {
 	int i, err;
 
-	info("GPIO component initializing...\n");
-	info("%d GPIOs requested.", num_requested_gpios);
+	dbg("GPIO component initializing...\n");
+	dbg("%d GPIOs requested.", num_requested_gpios);
 
 	/* Drop if the array length is invalid. */
 	if ((err = num_requested_gpios) <= 0) {
@@ -96,25 +111,58 @@ int gpio_init(void)
 	state.buttons =
 	    kzalloc(state.num_buttons * sizeof(struct button), GFP_KERNEL);
 
-	if ((err = state.buttons) == NULL) {
-		err("%d. Could not allocate space state.buttons.", err);
-		return err;
+	if (state.buttons < 0) {
+		err("%p. Could not allocate space state.buttons.",
+		    state.buttons);
+		return state.buttons;
 	}
 
 	for (i = 0; i < state.num_buttons; i++) {
+		err = -EINVAL;
+		if (!is_valid(requested_gpios[3 * i])) {
+			err("Invalid gpio: %d\n", requested_gpios[3 * i]);
+			goto free_buttons;
+		}
 		state.buttons[i].gpio_start.gpio = requested_gpios[3 * i];
+		state.buttons[i].gpio_start.flags = GPIO_MODE;
+		if (!is_valid(requested_gpios[3 * i + 1])) {
+			err("Invalid gpio: %d\n", requested_gpios[3 * i] + 1);
+			goto free_buttons;
+		}
 		state.buttons[i].gpio_end.gpio = requested_gpios[3 * i + 1];
+		state.buttons[i].gpio_end.flags = GPIO_MODE;
 		state.buttons[i].pitch = requested_gpios[3 * i + 2];
-		info("Setting button %d: gpio_start = %d, gpio_end = %d, "
-		     "pitch = %d\n", state.buttons[i].gpio_start,
-		     state.buttons[i].gpio_end, state.buttons[i].pitch);
+		dbg("Setting button %d: gpio_start = %d, gpio_end = %d, "
+		    "pitch = %d\n", state.buttons[i].gpio_start.gpio,
+		    state.buttons[i].gpio_end.gpio, state.buttons[i].pitch);
+
+		if ((err =
+		     gpio_request_one(state.buttons[i].gpio_start.gpio,
+				      state.buttons[i].gpio_start.flags,
+				      state.buttons[i].gpio_start.label)) < 0) {
+			err("%d. Could not request gpio %d.",
+			    err, state.buttons[i].gpio_start.gpio);
+			goto free_buttons;
+		}
+		if ((err =
+		     gpio_request_one(state.buttons[i].gpio_end.gpio,
+				      state.buttons[i].gpio_end.flags,
+				      state.buttons[i].gpio_end.label)) < 0) {
+			err("%d. Could not request gpio %d.", err,
+			    state.buttons[i].gpio_end.gpio);
+			goto free_buttons;
+		}
 	}
 
 	return 0;
+
+ free_buttons:
+	kfree(state.buttons);
+	return err;
 }
 
 void gpio_exit(void)
 {
-	info("GPIO component exiting...");
+	dbg("GPIO component exiting...");
 	kfree(state.buttons);
 }
