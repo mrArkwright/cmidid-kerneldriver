@@ -5,6 +5,8 @@
 #include <sound/asoundef.h>
 #include <linux/slab.h>
 
+#include <linux/spinlock.h>
+
 #include "rtpmidi.h"
 #include "message.h"
 #include "applemidi.h"
@@ -40,6 +42,8 @@ _alsa_input(struct snd_seq_event *ev, int direct, void *private_data,
 {
 	struct privateData *data= (struct privateData *)private_data;
 	pr_debug("callback from alsa received of type %d\n",ev->type);
+    
+    spin_lock(&(data->drv.lock));
 	
 	//data->list[0].message=;
     
@@ -69,6 +73,8 @@ _alsa_input(struct snd_seq_event *ev, int direct, void *private_data,
 		
 	
 	RTPMIDISessionSend( data->drv->rtpmidi_session, &(data->list) );
+    
+    spin_unlock(&(data->drv.lock))
 	
 	return 0;
 	

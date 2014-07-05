@@ -2,6 +2,7 @@
 #define APPLEMIDI_H
 
 #include <net/sock.h>
+#include <linux/spinlock.h>
 
 #include "midi.h"
 
@@ -45,6 +46,7 @@ struct AppleMIDICommand {
 
 
 struct MIDIDriverAppleMIDI {
+    spinlock_t lock
 	struct MIDIDriver base;
 	struct socket *control_socket;
 	struct socket *rtp_socket;
