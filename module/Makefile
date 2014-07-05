@@ -8,7 +8,7 @@ KSRC:=/lib/modules/$(shell uname -r)/build
 
 SRC_FILES := $(wildcard *.c)
 
-all: indent
+all: indent ioctl_test
 	$(MAKE) -C $(KSRC)  M=$(SRC) modules
 
 clean:
@@ -16,3 +16,6 @@ clean:
 
 indent:
 	indent -linux $(SRC_FILES)
+
+ioctl_test: ioctl_test.c
+	gcc $^ -o $@
