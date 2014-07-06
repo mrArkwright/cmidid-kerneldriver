@@ -16,7 +16,10 @@
 static int gpio_mapping[MAX_REQUEST];
 static int gpio_mapping_size;
 module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
-MODULE_PARM_DESC(gpio_mapping, "ids for the required gpios.");
+MODULE_PARM_DESC(gpio_mapping,
+		 "Mapping of GPIOs to Keys. Format: gpio1, gpio2, note, ...");
+
+int get_key_from_gpio(struct key **k_ret, unsigned char *button_ret);
 
 #define START_BUTTON 0
 #define END_BUTTON 1
@@ -39,27 +42,73 @@ struct key {
 struct cmidid_gpio_state {
 	struct key *keys;
 	int num_keys;
+	bool button_active_high[2];
 };
 
 struct cmidid_gpio_state state;
 
-/*
- * Returns the index of a given irq value in the irqs array.
- * Used to get the corresponding gpio from the gpios array.
- * Unfortunatly the function `int irq_to_gpio(int irq)'
- * in linux/gpio.h didn't work for me.
- */
-static struct key *get_key_from_gpio(int irq)
+static void handle_button_event(int irq, bool active)
 {
-	int i;
+	struct key *k;
+	unsigned char button;
 
-	for (i = 0; i < state.num_keys; i++) {
-		if (state.keys[i].irqs[START_BUTTON] == irq ||
-		    state.keys[i].irqs[END_BUTTON] == irq)
-			return &state.keys[i];
+	if (get_key_from_gpio(&k, &button) < 0) {
+		dbg("irq not assigned to key\n");
+		return;
 	}
 
-	return NULL;
+	switch (k->state) {
+	case KEY_INACTIVE:
+		if ((button = START_BUTTON) && active) {
+			//start counting
+			k->state = KEY_TOUCHED;
+		} else if ((button = START_BUTTON) && !active) {
+			//noteoff
+		}
+		break;
+	case KEY_TOUCHED:
+		if ((button = START_BUTTON) && !active) {
+			//noteoff
+			k->state = KEY_INACTIVE;
+		} else if ((button = END_BUTTON) && active) {
+			//calculate velocity
+			//noteon
+			k->state = KEY_PRESSED;
+		}
+		break;
+	case KEY_PRESSED:
+		if ((button = START_BUTTON) && !active) {
+			//noteoff
+			k->state = KEY_INACTIVE;
+		} else if ((button = END_BUTTON) && active) {
+			//repeat noteon
+		}
+		break;
+	default:
+		//noteoff
+		k->state = KEY_INACTIVE;
+	}
+}
+
+int get_key_from_gpio(struct key **k_ret, unsigned char *button_ret)
+{
+	struct key *k;
+
+	for (k = state.keys; k < state.keys + state.num_keys; k++) {
+		if (k->irqs[START_BUTTON] == irq) {
+			*k_ret = k;
+			*button_ret = START_BUTTON;
+			return 0;
+		}
+
+		if (k->irqs[END_BUTTON] == irq) {
+			*k_ret = k;
+			*button_ret = END_BUTTON;
+			return 0;
+		}
+	}
+
+	return -1;
 }
 
 /*
@@ -67,13 +116,13 @@ static struct key *get_key_from_gpio(int irq)
  */
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
-	struct key *k;
+	//struct key *k;
 	info("Interrupt handler called %d: %p.\n", irq, dev_id);
-	k = get_key_from_gpio(irq);
+	/*k = get_key_from_gpio(irq);
 
-	if (k != NULL) {
-		send_note(k->note, 100);
-	}
+	   if (k != NULL) {
+	   send_note(k->note, 100);
+	   } */
 
 	return IRQ_HANDLED;
 }
@@ -140,7 +189,7 @@ int gpio_init(void)
 		}
 		k->gpios[START_BUTTON].gpio =
 		    gpio_mapping[3 * i + START_BUTTON];
-		k->gpios[START_BUTTON].flags = GPIO_MODE;
+		k->gpios[START_BUTTON].flags = GPIOF_IN;
 		k->gpios[START_BUTTON].label = "NO_LABEL";
 
 		if (!is_valid(gpio_mapping[3 * i + END_BUTTON])) {
@@ -150,7 +199,7 @@ int gpio_init(void)
 			goto free_buttons;
 		}
 		k->gpios[END_BUTTON].gpio = gpio_mapping[3 * i + END_BUTTON];
-		k->gpios[END_BUTTON].flags = GPIO_MODE;
+		k->gpios[END_BUTTON].flags = GPIOF_IN;
 		k->gpios[END_BUTTON].label = "NO_LABEL";
 
 		k->note = gpio_mapping[3 * i + 2];
@@ -186,14 +235,16 @@ int gpio_init(void)
 
 		if ((err =
 		     request_irq(k->irqs[START_BUTTON], irq_handler,
-				 IRQ_TRIGGER, "irq_start", NULL)) < 0) {
+				 IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+				 "irq_start", NULL)) < 0) {
 			err("Could not request irq for key.\n");
 			err = -EINVAL;
 			goto free_buttons;
 		}
 
 		if ((err =
-		     request_irq(k->irqs[END_BUTTON], irq_handler, IRQ_TRIGGER,
+		     request_irq(k->irqs[END_BUTTON], irq_handler,
+				 IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 				 "irq_start", NULL)) < 0) {
 			err("Could not request irq for key.\n");
 			err = -EINVAL;
