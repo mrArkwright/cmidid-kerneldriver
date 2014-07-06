@@ -9,4 +9,6 @@ void note_off(unsigned char note);
 
 void midi_exit(void);
 
+long transpose(unsigned long arg);
+
 #endif

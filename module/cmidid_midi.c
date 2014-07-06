@@ -9,8 +9,20 @@
 
 #include "cmidid_main.h"
 
+unsigned long transposed = 0;
+
 struct snd_card *card;
 static int client = 0;
+
+long transpose(unsigned long arg)
+{
+	transposed += arg;
+	if (transposed < -127)
+		transposed = -127;
+	else if (transposed > 127)
+		transposed = 127;
+	return transposed;
+}
 
 static void config_note_event(struct snd_seq_event *event, unsigned char note,
 			      unsigned char velocity,
@@ -40,6 +52,9 @@ void note_off(unsigned char note)
 static void config_note_event(struct snd_seq_event *event, unsigned char note,
 			      unsigned char velocity, snd_seq_event_type_t type)
 {
+
+	note += transposed;
+
 	if (note <= 0)
 		note = 0;
 	if (note >= 127)

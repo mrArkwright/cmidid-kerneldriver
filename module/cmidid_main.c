@@ -111,8 +111,25 @@ static void __exit cmidid_exit(void)
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
-	case CMIDID_CALIBRATE:
-		dbg("calibrating now\n");
+	case CMIDID_CALIBRATE_MIN_TIME:
+		return set_min_stroke_time();
+	case CMIDID_CALIBRATE_MAX_TIME:
+		return set_max_stroke_time();
+	case CMIDID_VEL_CURVE_LINEAR:
+		set_vel_curve_linear();
+		break;
+	case CMIDID_VEL_CURVE_CONCAVE:
+		set_vel_curve_concave();
+		break;
+	case CMIDID_VEL_CURVE_CONVEX:
+		set_vel_curve_convex();
+		break;
+	case CMIDID_VEL_CURVE_SATURATED:
+		set_vel_curve_saturated();
+		break;
+
+	case CMIDID_TRANSPOSE:
+		return transpose(arg);
 		break;
 	default:
 		dbg("unknown ioctl command\n");
