@@ -4,7 +4,10 @@ aconnect -x
 
 ./start_module.sh
 
-aconnect 24:0 128:0
+CMIDID_PORT=$(aconnect -i | grep -i "cmidid" | awk '{print $2}' | sed -e 's/://')
+echo "Using ALSA port ${CMIDID_PORT} for our cmidid kernel module."
 
-# MODNAME=$(cat cmidid_main.h | grep "#define MODULE_NAME" | awk '{print $3}' | sed -e 's/"//g')
-# VERSION=$(dmesg | grep -i "registered character device" | tail -n 1 | awk '{print $7}' | sed -e 's/\.//')
+FSYNTH_PORT=$(aconnect -o | grep -i "fluid synth" | awk '{print $2}' | sed -e 's/://')
+echo "Using ALSA port ${FSYNTH_PORT} for FLUID Synth."
+
+aconnect ${CMIDID_PORT}:0 ${FSYNTH_PORT}:0

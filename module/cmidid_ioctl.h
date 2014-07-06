@@ -11,4 +11,6 @@
 #define CMIDID_VEL_CURVE_CONVEX _IO(0, 4)
 #define CMIDID_VEL_CURVE_SATURATED _IO(0, 5)
 
+#define CMIDID_TRANSPOSE _IO(0, 6)
+
 #endif
