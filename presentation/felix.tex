@@ -133,114 +133,40 @@
 			\item Windows
 			\item nmj (Java)\\$\vdots$
 		\end{itemize}
+		\pause
+		\item open source
+		\begin{itemize}
+			\item nodejs
+			\item midikit (userspace)
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{kernel driver}
+	partial port of midikit to kernel module
+	
+	features
+	\begin{itemize}
+		\item AppleMIDI Session Mgnt
+		\item synchronization
+		\item alsa callbacks for events
+		\item peer management (multiple)
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{outlook}
+	features
+	\begin{itemize}
+		\item bidirectional (receive RTPMidi)
+		\item full MIDI command set
+		\item feedback
+		\item journal (backward recovery)
 	\end{itemize}
 	\pause
-	\centering
-	\includegraphics[width=4cm]{img/Node.pdf}
-\end{frame}
-
-
-
-\begin{frame}
-	\centering
-	\begin{tikzpicture}
-		\node at (0,0.5) {\includegraphics[width=6cm]{img/snail_n.jpg}};
-		\node at (4,3) {\huge Real-Time};
-		\node at (3.5,4) {\Large Latenz};
-		\node at (5,2.3) {\large Performance (RPi)};
-	\end{tikzpicture}
-	
-\end{frame}
-
-%\begin{frame}[fragile]{ALSA $\Leftrightarrow$ rtpMIDI}
-%	userspace APIs FTW!
-%	
-%
-%\begin{lstlisting}
-%input = new midi.input(),
-%output = new midi.output(),
-%session = ...createSession({
-%    localName: 'Session 1',
-%    bonjourName: 'Node RTPMidi',
-%    port: 5008
-%});
-%input.on('message', function(deltaTime, msg) {
-%    session.sendMessage(deltaTime, msg);
-%});
-%\end{lstlisting}
-%
-%\end{frame}
-
-\begin{frame}{Setup}
-	\begin{center}
-	\begin{tikzpicture}
-		\node at (1,0) {\includegraphics[width=0.7cm]{img/apple.jpg}};
-		\node (ssho) at (2,0) {\texttt{ssh}};
-		\node (lano) at (4,0) {\includegraphics[width=0.5cm,angle=90]{img/plug.png}};
-		\path[snake=expanding waves,segment length=1mm,segment angle=10,draw,thick] (ssho) -- (lano);
-		\node at (5,-0.03) {\includegraphics[width=0.5cm,angle=270]{img/plug.png}};
-		\node at (6,0) {\texttt{ssh}};
-		\node at (7,0) {user C};
-	\end{tikzpicture}\\[0.1cm]
-	\begin{tikzpicture}
-		\node at (0,0) {ALSA};
-	\end{tikzpicture}\\[0.1cm]
-	
-	\begin{tikzpicture}
-		\node (node) at (0.5,0) {\includegraphics[width=1.5cm]{img/Node.pdf}};
-		\node (rtp) at (2,0) {rtpMIDI};
-		\node  at (3.5,0) {\includegraphics[width=0.5cm,angle=90]{img/plug.png}};
-		
-		\node (lan) at (4.5,-0.03) {\includegraphics[width=0.5cm,angle=270]{img/plug.png}};
-		
-		\node (core) at (6.5,0) {\includegraphics[width=0.5cm]{img/apple.jpg}};
-		\node at (7.2,0) {MIDI};
-		
-		
-		\path[snake=expanding waves,segment length=1mm,segment angle=10,draw,thick] (lan) -- (core);
-		\node (ssho) at (8.5,0) {synth};
-	\end{tikzpicture}\\[0.2cm]
-	\end{center}
-	
-	ping (RTT)
-	
-	\[2.291\pm0.722\text{\,ms}\]
-	
-\end{frame}
-
-\begin{frame}{Roundtrip}
-	\begin{tikzpicture}
-		\node [right] at (0,0) {\includegraphics[height=4cm]{img/wire.jpg}};
-		\pause
-		\node at (2.5,2.5) {$\Delta t$ [s]};
-	
-		%\draw (1.1,1.05) rectangle (3.6,1.5);
-		\fill[opacity=0.7,fill=white] (0,-2.2) -- (0,2.2) -- (1.1,2.2) -- (1.1,1.05) -- (3.6,1.05) -- (3.6,1.5) -- (1.1,1.5) -- (1.1,2.2) -- (14,2.2) -- (14,-2.2) -- cycle;
-	\end{tikzpicture}
-	
-	\[\approx 7\pm2\text{\,ms}\]
-	
-\end{frame}
-
-\begin{frame}{Development}
-	\begin{itemize}
-		\item rtpMIDI protocol implementation 
-		\item in kernel space
-		\pause
-		\item called by GPIO ISRs
-	\end{itemize}
-	\includegraphics[width=\textwidth]{img/kernelmidi.jpg}
-\end{frame}
-
-\begin{frame}{TODO}
+	analysis
 	\begin{itemize}
 		\item Jitter
-		\item Ausreißer
-		\item Journal/ever playing note
-		\item Kapazität
-		\item support multiple keys
-		\item easy configuration of GPIO layout
-		\item optional: support for different music devices
+		\item capacity (100 notes/second)
 	\end{itemize}
 \end{frame}
 
