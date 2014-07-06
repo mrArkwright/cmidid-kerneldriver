@@ -5,4 +5,6 @@
 
 #define CMIDID_CALIBRATE _IO(0, 0)
 
+#define CMIDID_TRANSPOSE _IO(0, 2)
+
 #endif

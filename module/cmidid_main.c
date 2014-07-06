@@ -114,6 +114,10 @@ static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	case CMIDID_CALIBRATE:
 		dbg("calibrating now\n");
 		break;
+
+	case CMIDID_TRANSPOSE:
+		return transpose(arg);
+		break;
 	default:
 		dbg("unknown ioctl command\n");
 	}
