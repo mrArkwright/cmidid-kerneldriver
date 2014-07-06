@@ -128,11 +128,15 @@
 
 \begin{frame}{velocity curves}
 	\begin{tikzpicture}
-		\begin{axis}[width=\textwidth,xtick=\empty,extra x ticks={0,20,100},extra x tick labels={$0$,$t_{min}$,$t_{max}$},ytick={0,32,64,96,127},height=8cm,ymin=0,ymax=139,xmin=0,xmax=110,ylabel={velocity},xlabel={time delay},log basis y={2}]
+		\begin{axis}[width=\textwidth,xtick=\empty,extra x ticks={0,20,100},extra x tick labels={$0$,$t_{min}$,$t_{max}$},ytick={0,32,64,96,127},height=8cm,ymin=0,ymax=139,xmin=0,xmax=110,ylabel={velocity},xlabel={time delay},log basis y={2},legend pos=south west]
 			\addplot[draw=blue,domain=20:100] {-1.58*x+158};
+			\addlegendentry{linear};
 			\addplot[draw=red,domain=20:100] {20560.6/(x - 180.63) + 255};
+			\addlegendentry{concave};
 			\addplot[draw=orange,domain=20:100] {4207.87/(x + 5.19685) - 40};
+			\addlegendentry{convex};
 			\addplot[draw=green,domain=60:100] {573.228/(x - 104.094) + 140};
+			\addlegendentry{saturated};
 			\addplot[draw=black,domain=0:20] {127};
 			\addplot[draw=green,domain=20:60] {127};
 		\end{axis}
