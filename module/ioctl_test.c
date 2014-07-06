@@ -16,6 +16,7 @@ int main(int argc, char *argv[])
 	int fd;
 	int value;
 	int err = 0;
+	uint32_t min_time;
 
 	fd = open(file_name, 0);
 	if (fd == -1) {
@@ -29,8 +30,8 @@ int main(int argc, char *argv[])
 		err = scanf("%d", &value);
 		switch (value) {
 		case 1:
-			/*uint32_t min_time = ioctl(fd, CMIDID_CALIBRATE_MIN_TIME);
-			   printf("min time set to %d\n", min_time); */
+			min_time = ioctl(fd, CMIDID_CALIBRATE_MIN_TIME);
+			printf("min time set to %d\n", min_time);
 			break;
 		case 2:
 			printf("Current transpose is %ld add:",
