@@ -37,7 +37,8 @@ struct key {
 	KEY_STATE state;
 	struct gpio gpios[2];	/* GPIO port for first trigger. */
 	unsigned int irqs[2];
-	s64 hit_time[2];
+	ktime_t hit_time;
+	//s64 hit_time[2];
 	bool timer_started[2];
 	struct hrtimer hrtimers[2];
 	unsigned char note;
@@ -54,21 +55,16 @@ int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret);
 
 struct cmidid_gpio_state state;
 
-static void handle_button_event(int irq, bool active)
+static void handle_button_event(struct key *k, unsigned char button,
+				bool active)
 {
-	struct key *k;
-	unsigned char button;
 	unsigned char velocity;
-
-	if (get_key_from_irq(irq, &k, &button) < 0) {
-		dbg("irq not assigned to key\n");
-		return;
-	}
+	ktime_t timediff;
 
 	switch (k->state) {
 	case KEY_INACTIVE:
 		if ((button == START_BUTTON) && active) {
-			//start counting
+			k->hit_time = ktime_get();
 			k->state = KEY_TOUCHED;
 		} else if ((button == START_BUTTON) && !active) {
 			note_off(k->note);
@@ -80,7 +76,10 @@ static void handle_button_event(int irq, bool active)
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
 			//calculate velocity
-			velocity = 100;
+			timediff = ktime_sub(k->hit_time, ktime_get());
+			//TODO: nice math calculation function
+			velocity = (unsigned char)timediff.tv64 >> 24;
+			//velocity = 100;
 			note_on(k->note, velocity);
 			k->last_velocity = velocity;
 			k->state = KEY_PRESSED;
@@ -124,19 +123,26 @@ int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 	return -1;
 }
 
-static struct key *get_key_from_timer(struct hrtimer *timer)
+static struct key *get_key_from_timer(struct hrtimer *timer,
+				      unsigned char *index)
 {
 	int i;
 
 	for (i = 0; i < state.num_keys; i++) {
-		if (&state.keys[i].hrtimers[START_BUTTON] == timer ||
-		    &state.keys[i].hrtimers[END_BUTTON] == timer)
+		if (&state.keys[i].hrtimers[START_BUTTON] == timer) {
+			*index = START_BUTTON;
 			return &state.keys[i];
+		}
+		if (&state.keys[i].hrtimers[START_BUTTON] == timer) {
+			*index = END_BUTTON;
+			return &state.keys[i];
+		}
 	}
 
 	return NULL;
 }
 
+/*
 static struct gpio *get_gpio_from_timer(struct hrtimer *timer)
 {
 	struct key *k = get_key_from_timer(timer);
@@ -146,23 +152,33 @@ static struct gpio *get_gpio_from_timer(struct hrtimer *timer)
 		return &k->gpios[END_BUTTON];
 	return NULL;
 }
-
+*/
 enum hrtimer_restart timer_irq(struct hrtimer *timer)
 {
 	struct key *k;
-	int gpio_value_start, gpio_value_end;
+	int gpio_active;	// gpio_value_start, gpio_value_end;
+	unsigned char button;
 
 	k = NULL;
-	k = get_key_from_timer(timer);
+	k = get_key_from_timer(timer, &button);
 	if (k == NULL) {
 		err("htimer not found \n");
 		return HRTIMER_NORESTART;
 	}
+/*
 	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
 	gpio_value_end = gpio_get_value(k->gpios[END_BUTTON].gpio);
 
 	info("TIMER Interrupt handler called %lu: timer value [%d, %d]\n",
 	     timer->state, gpio_value_start, gpio_value_end);
+*/
+	gpio_active = gpio_get_value(k->gpios[button].gpio);
+
+	k->timer_started[button] = false;
+
+	info("Timer Button GPIO %d detected as %hhd\n", k->gpios[button].gpio,
+	     gpio_active);
+	handle_button_event(k, button, gpio_active);
 
 	return HRTIMER_NORESTART;
 }
@@ -192,9 +208,8 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	if (k != NULL && !k->timer_started[index]) {
 		res = hrtimer_start(&k->hrtimers[0], diff, HRTIMER_MODE_REL);
 		info("hrtimer_start res: :%d\n", res);
-		k->timer_started[index]=true;
+		k->timer_started[index] = true;
 	}
-	handle_button_event(irq, true);
 
 	return IRQ_HANDLED;
 }
