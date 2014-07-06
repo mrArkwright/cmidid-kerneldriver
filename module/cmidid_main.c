@@ -33,28 +33,19 @@ static struct cdev *cmidid_driver_object;
 static struct class *cmidid_class;
 struct device *cmidid_device;
 
-/*
- * GPIOs requested via kernel parameter.
- * This is a simple list of gpio ids with an corresponding pitch.
- */
-int requested_gpios[MAX_REQUEST];
-int num_requested_gpios;
-module_param_array(requested_gpios, int, &num_requested_gpios, 0);
-MODULE_PARM_DESC(requested_gpios, "ids for the required gpios.");
-
 static int __init cmidid_init(void)
 {
 	int err;
-	pr_debug("Module initializing...");
+	pr_debug("Module initializing...\n");
 
 	if (alloc_chrdev_region(&cmidid_dev_number, 0, 1, IOCTL_DEV_NAME) < 0) {
-		pr_err("error allocating character device region");
+		pr_err("error allocating character device region\n");
 		return -EIO;
 	}
 
 	cmidid_driver_object = cdev_alloc();
 	if (cmidid_driver_object == NULL) {
-		pr_err("error allocating character device");
+		pr_err("error allocating character device\n");
 		err = -EIO;
 		goto free_device_number;
 	}
@@ -62,7 +53,7 @@ static int __init cmidid_init(void)
 	cmidid_driver_object->ops = &cmidid_fops;
 
 	if (cdev_add(cmidid_driver_object, cmidid_dev_number, 1)) {
-		pr_err("error adding character device");
+		pr_err("error adding character device\n");
 		err = -EIO;
 		goto free_cdev;
 	}
@@ -83,24 +74,31 @@ static int __init cmidid_init(void)
 	}
 
 	return 0;
+
  err_gpio_init:
 	midi_exit();
+
  err_midi_init:
 	device_destroy(cmidid_class, cmidid_dev_number);
 	class_destroy(cmidid_class);
 	cdev_del(cmidid_driver_object);
+
  free_cdev:
 	kobject_put(&cmidid_driver_object->kobj);
+
  free_device_number:
 	unregister_chrdev_region(cmidid_dev_number, 1);
+
 	return err;
 }
 
 static void __exit cmidid_exit(void)
 {
 	dbg("Module exiting...\n");
+
 	gpio_exit();
 	midi_exit();
+
 	dbg("Unregistering char device\n");
 	/* Delete Sysfs entry and device file  */
 	device_destroy(cmidid_class, cmidid_dev_number);
@@ -112,7 +110,13 @@ static void __exit cmidid_exit(void)
 
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
-	dbg("`cmidid_ioctl' called with f=%p, cmd=%d, arg=%lu\n", f, cmd, arg);
+	switch (cmd) {
+	case CMIDID_CALIBRATE:
+		dbg("calibrating now\n");
+		break;
+	default:
+		dbg("unknown ioctl command\n");
+	}
 
 	return 0;
 }
