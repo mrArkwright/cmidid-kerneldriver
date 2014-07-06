@@ -17,9 +17,12 @@ static int gpio_mapping[MAX_REQUEST];
 static int gpio_mapping_size;
 module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
-		 "Mapping of GPIOs to Keys. Format: gpio1, gpio2, note, ...");
+		 "Mapping of GPIOs to Keys. Format: gpio1a, gpio1b, note1, gpio2a, ...");
 
-int get_key_from_gpio(struct key **k_ret, unsigned char *button_ret);
+static unsigned int jitter_res_time = 100000;
+module_param(jitter_res_time, uint, 0);
+MODULE_PARM_DESC(jitter_res_time,
+		 "timing offset before button hits are registered.");
 
 #define START_BUTTON 0
 #define END_BUTTON 1
@@ -35,7 +38,8 @@ struct key {
 	struct gpio gpios[2];	/* GPIO port for first trigger. */
 	unsigned int irqs[2];
 	s64 hit_time[2];
-	int note;
+	struct hrtimer hrtimers[2];
+	unsigned char note;
 	int last_velocity;
 };
 
@@ -45,52 +49,60 @@ struct cmidid_gpio_state {
 	bool button_active_high[2];
 };
 
+int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret);
+
 struct cmidid_gpio_state state;
 
 static void handle_button_event(int irq, bool active)
 {
 	struct key *k;
 	unsigned char button;
+	unsigned char velocity;
 
-	if (get_key_from_gpio(&k, &button) < 0) {
+	if (get_key_from_irq(irq, &k, &button) < 0) {
 		dbg("irq not assigned to key\n");
 		return;
 	}
 
 	switch (k->state) {
 	case KEY_INACTIVE:
-		if ((button = START_BUTTON) && active) {
+		if ((button == START_BUTTON) && active) {
 			//start counting
 			k->state = KEY_TOUCHED;
-		} else if ((button = START_BUTTON) && !active) {
-			//noteoff
+		} else if ((button == START_BUTTON) && !active) {
+			note_off(k->note);
 		}
 		break;
 	case KEY_TOUCHED:
-		if ((button = START_BUTTON) && !active) {
-			//noteoff
+		if ((button == START_BUTTON) && !active) {
+			note_off(k->note);
 			k->state = KEY_INACTIVE;
-		} else if ((button = END_BUTTON) && active) {
+		} else if ((button == END_BUTTON) && active) {
 			//calculate velocity
-			//noteon
+			velocity = 100;
+			note_on(k->note, velocity);
+			k->last_velocity = velocity;
 			k->state = KEY_PRESSED;
 		}
 		break;
 	case KEY_PRESSED:
-		if ((button = START_BUTTON) && !active) {
-			//noteoff
+		if ((button == START_BUTTON) && !active) {
+			note_off(k->note);
 			k->state = KEY_INACTIVE;
-		} else if ((button = END_BUTTON) && active) {
-			//repeat noteon
+		} else if ((button == END_BUTTON) && active) {
+			note_on(k->note, k->last_velocity);
 		}
 		break;
 	default:
-		//noteoff
+		note_off(k->note);
 		k->state = KEY_INACTIVE;
 	}
+
+	dbg("key state: %d, button: %d, active: %d, note: %d\n", k->state,
+	    button, active, k->note);
 }
 
-int get_key_from_gpio(struct key **k_ret, unsigned char *button_ret)
+int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 {
 	struct key *k;
 
@@ -111,18 +123,75 @@ int get_key_from_gpio(struct key **k_ret, unsigned char *button_ret)
 	return -1;
 }
 
+static struct key *get_key_from_timer(struct hrtimer *timer)
+{
+	int i;
+
+	for (i = 0; i < state.num_keys; i++) {
+		if (&state.keys[i].hrtimers[START_BUTTON] == timer ||
+		    &state.keys[i].hrtimers[END_BUTTON] == timer)
+			return &state.keys[i];
+	}
+
+	return NULL;
+}
+
+static struct gpio *get_gpio_from_timer(struct hrtimer *timer)
+{
+	struct key *k = get_key_from_timer(timer);
+	if (timer == &k->hrtimers[START_BUTTON])
+		return &k->gpios[START_BUTTON];
+	if (timer == &k->hrtimers[END_BUTTON])
+		return &k->gpios[END_BUTTON];
+	return NULL;
+}
+
+enum hrtimer_restart timer_irq(struct hrtimer *timer)
+{
+	struct key *k;
+	int gpio_value_start, gpio_value_end;
+
+	k = NULL;
+	k = get_key_from_timer(timer);
+	if (k == NULL) {
+		err("htimer not found \n");
+		return HRTIMER_NORESTART;
+	}
+	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
+	gpio_value_end = gpio_get_value(k->gpios[END_BUTTON].gpio);
+
+	info("TIMER Interrupt handler called %lu: timer value [%d, %d]\n",
+	     timer->state, gpio_value_start, gpio_value_end);
+	return HRTIMER_NORESTART;
+}
+
 /*
  * The interrupt handler for every GPIO interrupt.
  */
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
-	//struct key *k;
-	info("Interrupt handler called %d: %p.\n", irq, dev_id);
-	/*k = get_key_from_gpio(irq);
+	struct key *k;
+	unsigned char index;
+	ktime_t diff;
+	int gpio_value_start, gpio_value_end, res;
 
-	   if (k != NULL) {
-	   send_note(k->note, 100);
-	   } */
+	ktime_t time = ktime_get();
+	get_key_from_irq(irq, &k, &index);
+
+	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
+	gpio_value_end = gpio_get_value(k->gpios[END_BUTTON].gpio);
+
+	info("Interrupt handler called %d: gpio value [%d, %d]. (%lld ns)\n",
+	     irq, gpio_value_start, gpio_value_end, time.tv64);
+
+	//TODO: into global space :
+	diff = ktime_set(0, jitter_res_time);
+
+	if (k != NULL) {
+		res = hrtimer_start(&k->hrtimers[0], diff, HRTIMER_MODE_REL);
+		info("hrtimer_start res: :%d\n", res);
+	}
+	handle_button_event(irq, true);
 
 	return IRQ_HANDLED;
 }
@@ -148,10 +217,10 @@ static bool is_valid(int gpio)
 
 int gpio_init(void)
 {
-	int err;
 	int i;
 	struct key *k;
 	unsigned int irq;
+	int err = 0;
 
 	dbg("GPIO component initializing...\n");
 
@@ -177,9 +246,11 @@ int gpio_init(void)
 	}
 
 	for (i = 0; i < state.num_keys; i++) {
-		k = state.keys + i;
+		k = &state.keys[i];
 
 		k->state = KEY_INACTIVE;
+
+		k->last_velocity = 0;
 
 		if (!is_valid(gpio_mapping[3 * i + START_BUTTON])) {
 			err("Invalid gpio: %d\n",
@@ -224,6 +295,15 @@ int gpio_init(void)
 		}
 		k->irqs[START_BUTTON] = irq;
 
+		hrtimer_init(&state.keys[i].hrtimers[START_BUTTON],
+			     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		hrtimer_init(&state.keys[i].hrtimers[END_BUTTON],
+			     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+
+		state.keys[i].hrtimers[START_BUTTON].function = &timer_irq;
+		state.keys[i].hrtimers[END_BUTTON].function = &timer_irq;
+
+		dbg("hrtimer initialized\n");
 		irq = gpio_to_irq(k->gpios[END_BUTTON].gpio);
 		if (irq < 0) {
 			err("Could not request irq for gpio %d.\n",
@@ -258,6 +338,8 @@ int gpio_init(void)
 
 	for (--i; i > 0; --i) {
 		gpio_free_array(state.keys[i].gpios, 2);
+		hrtimer_cancel(&state.keys[i].hrtimers[END_BUTTON]);
+		hrtimer_cancel(&state.keys[i].hrtimers[START_BUTTON]);
 	}
 
 	kfree(state.keys);
@@ -274,6 +356,8 @@ void gpio_exit(void)
 		free_irq(state.keys[i].irqs[START_BUTTON], NULL);
 		free_irq(state.keys[i].irqs[END_BUTTON], NULL);
 		gpio_free_array(state.keys[i].gpios, 2);
+		hrtimer_cancel(&state.keys[i].hrtimers[END_BUTTON]);
+		hrtimer_cancel(&state.keys[i].hrtimers[START_BUTTON]);
 	}
 
 	kfree(state.keys);

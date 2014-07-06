@@ -1,3 +1,5 @@
+#define DEBUG
+
 #include <linux/device.h>
 #include <linux/slab.h>
 
@@ -10,44 +12,68 @@
 struct snd_card *card;
 static int client = 0;
 
-static void config_note(struct snd_seq_event *note, unsigned char notevalue,
-			unsigned char velocity)
+static void config_note_event(struct snd_seq_event *event, unsigned char note,
+			      unsigned char velocity,
+			      snd_seq_event_type_t type);
+static void dispatch_event(struct snd_seq_event *event);
+
+void note_on(unsigned char note, unsigned char velocity)
 {
-	if (notevalue <= 0)
-		notevalue = 0;
-	if (notevalue >= 127)
-		notevalue = 127;
+	struct snd_seq_event event;
+
+	dbg("noteon\n");
+
+	config_note_event(&event, note, velocity, SNDRV_SEQ_EVENT_NOTEON);
+	dispatch_event(&event);
+}
+
+void note_off(unsigned char note)
+{
+	struct snd_seq_event event;
+
+	dbg("noteoff\n");
+
+	config_note_event(&event, note, 64, SNDRV_SEQ_EVENT_NOTEOFF);
+	dispatch_event(&event);
+}
+
+static void config_note_event(struct snd_seq_event *event, unsigned char note,
+			      unsigned char velocity, snd_seq_event_type_t type)
+{
+	if (note <= 0)
+		note = 0;
+	if (note >= 127)
+		note = 127;
 	if (velocity <= 0)
 		velocity = 0;
 	if (velocity >= 127)
 		velocity = 127;
 
-	note->type = SNDRV_SEQ_EVENT_NOTEON;
-	note->flags = SNDRV_SEQ_EVENT_LENGTH_FIXED | SNDRV_SEQ_PRIORITY_NORMAL;
-	note->data.note.note = notevalue;
-	note->data.note.channel = 0x00;
-	note->data.note.velocity = velocity;
-	note->data.note.duration = 0xffffff;
-	note->data.note.off_velocity = 0x64;
-	note->queue = SNDRV_SEQ_QUEUE_DIRECT;
-	note->dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
-	note->dest.port = 0;	/* FIXME: Which ports to use ? */
-	note->source.client = client;
-	note->source.port = 0;
+	event->type = type;
+	event->flags = SNDRV_SEQ_EVENT_LENGTH_FIXED | SNDRV_SEQ_PRIORITY_NORMAL;
+	event->data.note.note = note;
+	event->data.note.channel = 0x00;
+	event->data.note.velocity = velocity;
+	event->data.note.duration = 0xffffff;
+	event->data.note.off_velocity = 0x64;
+	event->queue = SNDRV_SEQ_QUEUE_DIRECT;
+	event->dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
+	event->dest.port = 0;	/* FIXME: Which ports to use ? */
+	event->source.client = client;
+	event->source.port = 0;
 }
 
-void send_note(unsigned char notevalue, unsigned char velocity)
+static void dispatch_event(struct snd_seq_event *event)
 {
-	struct snd_seq_event note;
 	int err;
 
 	if (client > 0) {
-		config_note(&note, notevalue, velocity);
 		err =
-		    snd_seq_kernel_client_dispatch(client, &note, in_atomic(),
+		    snd_seq_kernel_client_dispatch(client, event, in_atomic(),
 						   0);
+
 		if (err < 0) {
-			warn("Error dispatch client(%d) code:%d\n", client,
+			warn("couldn't dispatch note(%d) code:%d\n", client,
 			     err);
 		}
 	}
