@@ -13,6 +13,8 @@
 **/Module.symvers
 **/.tmp_versions
 
+module/ioctl_test
+
 presentation/*.orig
 presentation/*.aux
 presentation/*.nav
