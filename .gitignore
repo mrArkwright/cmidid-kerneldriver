@@ -15,6 +15,7 @@
 
 module/ioctl_test
 module/strawpi_start_module.sh
+module/start_module.sh
 
 presentation/*.orig
 presentation/*.aux
