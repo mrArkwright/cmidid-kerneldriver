@@ -4,9 +4,10 @@
 #include "message.h"
 struct RTPSession;
 
-struct RTPMIDISession * RTPMIDISessionCreate( struct RTPSession * session );
-void RTPMIDISessionRelease( struct RTPMIDISession * session );
+struct RTPMIDISession *RTPMIDISessionCreate(struct RTPSession *session);
+void RTPMIDISessionRelease(struct RTPMIDISession *session);
 
-int RTPMIDISessionSend( struct RTPMIDISession * session, struct MIDIMessageList * messages );
+int RTPMIDISessionSend(struct RTPMIDISession *session,
+		       struct MIDIMessageList *messages);
 
 #endif

@@ -3,26 +3,28 @@
 #include "midi.h"
 #include "clock.h"
 #include "alsa.h"
-	
+
 /**
  * @brief Initialize a MIDIDriver instance.
  * @public @memberof MIDIDriver
  * @param name The name to identify the driver.
  * @param rate The sampling rate to use.
  */
-void MIDIDriverInit( struct MIDIDriver * driver, char * name, MIDISamplingRate rate , void * drv) {
-  //MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
-	
+void MIDIDriverInit(struct MIDIDriver *driver, char *name,
+		    MIDISamplingRate rate, void *drv)
+{
+	// MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
+
 	pr_debug("init MIDIDriver\n");
 
-  driver->refs  = 1;
-  //driver->rls   = NULL;
-  //driver->port  = MIDIPortCreate( name, MIDI_PORT_IN | MIDI_PORT_OUT, driver, &_port_receive );
-  driver->port = ALSARegisterClient(drv);//ALSARegisterClient();
-  driver->clock = MIDIClockProvide( rate );
+	driver->refs = 1;
+	// driver->port  = MIDIPortCreate( name, MIDI_PORT_IN | MIDI_PORT_OUT,
+	// driver, &_port_receive );
+	driver->port = ALSARegisterClient(drv); // ALSARegisterClient();
+	driver->clock = MIDIClockProvide(rate);
 
-  //driver->send    = NULL;
-  //driver->destroy = NULL;
+	// driver->send    = NULL;
+	// driver->destroy = NULL;
 }
 
 /**
@@ -31,22 +33,18 @@ void MIDIDriverInit( struct MIDIDriver * driver, char * name, MIDISamplingRate r
  * @public @memberof MIDIDriver
  * @param driver The driver.
  */
-void MIDIDriverDestroy( struct MIDIDriver * driver ) {
-  //MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
-  /*if( driver->destroy != NULL ) {
-    (*driver->destroy)( driver );
-  }*/
-  if( driver->clock != NULL ) {
-    MIDIClockRelease( driver->clock );
-  }
-  ALSADeleteClient(driver->port);
-  /*if( driver->rls != NULL ) {
-    MIDIRunloopSourceInvalidate( driver->rls );
-    MIDIRunloopSourceRelease( driver->rls );
-  }*/
-  //MIDIPortInvalidate( driver->port );
-  //MIDIPortRelease( driver->port );
-  //kfree( driver );
+void MIDIDriverDestroy(struct MIDIDriver *driver)
+{
+	// MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
+	/*if( driver->destroy != NULL ) {
+	  (*driver->destroy)( driver );
+	}*/
+	if (driver->clock != NULL) {
+		MIDIClockRelease(driver->clock);
+	}
+	ALSADeleteClient(driver->port);
+	// MIDIPortInvalidate( driver->port );
+	// MIDIPortRelease( driver->port );
 }
 
 /**
@@ -55,9 +53,10 @@ void MIDIDriverDestroy( struct MIDIDriver * driver ) {
  * @public @memberof MIDIDriver
  * @param driver The driver.
  */
-void MIDIDriverRetain( struct MIDIDriver * driver ) {
-  //MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
-  driver->refs++;
+void MIDIDriverRetain(struct MIDIDriver *driver)
+{
+	// MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
+	driver->refs++;
 }
 
 /**
@@ -67,9 +66,10 @@ void MIDIDriverRetain( struct MIDIDriver * driver ) {
  * @public @memberof MIDIDriver
  * @param driver The driver.
  */
-void MIDIDriverRelease( struct MIDIDriver * driver ) {
-  //MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
-  if( ! --driver->refs ) {
-    MIDIDriverDestroy( driver );
-  }
+void MIDIDriverRelease(struct MIDIDriver *driver)
+{
+	// MIDIPrecondReturn( driver != NULL, EFAULT, (void)0 );
+	if (!--driver->refs) {
+		MIDIDriverDestroy(driver);
+	}
 }
