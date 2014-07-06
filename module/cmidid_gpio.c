@@ -12,6 +12,8 @@
 /*
  * GPIOs requested via kernel parameter.
  * This is a simple list of gpio ids with an corresponding pitch.
+ * The format for passing the values is:
+ * gpio_mapping=gpio1a,gpio1b,note1,gpio2a,gpio2b,note2
  */
 static int gpio_mapping[MAX_REQUEST];
 static int gpio_mapping_size;
@@ -19,6 +21,15 @@ module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
 		 "Mapping of GPIOs to Keys. Format: gpio1a, gpio1b, note1, gpio2a, ...");
 
+/*
+ * The time offset before every MIDI event is sent.
+ * Delaying the sending of MIDI events while ignoring subsequent button
+ * hits within the this time period can be used to counter button jittering.
+ *
+ * According to some testing we did, this value should be at least ~500us
+ * and probably less than ~10ms. Lower values will possibly result in
+ * jittering/bouncing and higher values could block legitimate button hits.
+ */
 static unsigned int jitter_res_time = 1000000;
 module_param(jitter_res_time, uint, 0);
 MODULE_PARM_DESC(jitter_res_time,
@@ -27,24 +38,52 @@ MODULE_PARM_DESC(jitter_res_time,
 #define START_BUTTON 0
 #define END_BUTTON 1
 
+/*
+ * Possible states for every button of our MIDI keyboard.
+ */
 typedef enum {
 	KEY_INACTIVE,
 	KEY_TOUCHED,
 	KEY_PRESSED
 } KEY_STATE;
 
+/*
+ * struct key:
+ *
+ * This struct represents a single button for an abstract MIDI keyboard.
+ * One key struct is created for every two GPIO ports/numbers passed via
+ * the `gpio_mapping' kernel parameter.
+ *
+ * KEY_STATE: The state is used to build a state machine like logic for
+ *   every button; something like INACTIVE->TOUCHED->PRESSED->INACTIVE...
+ * gpios: The two GPIOs which are used to build every button in hardware.
+ * irqs: The IRQ numbers for the corresponding GPIOs.
+ * hit_time: Time (in ns) when the button was hit/pressed.
+ * timer_started: This is used to mitigate the jittering on every GPIO port.
+ * hrtimers: Those are used to set a timeout for sending MIDI events.
+ * note: The corresponding MIDI note.
+ * last_velocity: The velocity (= strength) of the button hit.
+ */
 struct key {
 	KEY_STATE state;
-	struct gpio gpios[2];	/* GPIO port for first trigger. */
+	struct gpio gpios[2];
 	unsigned int irqs[2];
 	ktime_t hit_time;
-	//s64 hit_time[2];
 	bool timer_started[2];
 	struct hrtimer hrtimers[2];
 	unsigned char note;
 	int last_velocity;
 };
 
+/*
+ * cmidid_gpio_state:
+ *
+ * The state of this GPIO component of our kernel module.
+ * keys: The array of available keys for our keyboard.
+ * num_keys: The total number of available keys.
+ *
+ * TODO: button_active_high is currently unused. Implement IOCTL.
+ */
 struct cmidid_gpio_state {
 	struct key *keys;
 	int num_keys;
@@ -153,17 +192,6 @@ static struct key *get_key_from_timer(struct hrtimer *timer,
 	return NULL;
 }
 
-/*
-static struct gpio *get_gpio_from_timer(struct hrtimer *timer)
-{
-	struct key *k = get_key_from_timer(timer);
-	if (timer == &k->hrtimers[START_BUTTON])
-		return &k->gpios[START_BUTTON];
-	if (timer == &k->hrtimers[END_BUTTON])
-		return &k->gpios[END_BUTTON];
-	return NULL;
-}
-*/
 enum hrtimer_restart timer_irq(struct hrtimer *timer)
 {
 	struct key *k;
@@ -178,13 +206,7 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 		err("htimer not found \n");
 		return HRTIMER_NORESTART;
 	}
-/*
-	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
-	gpio_value_end = gpio_get_value(k->gpios[END_BUTTON].gpio);
 
-	info("TIMER Interrupt handler called %lu: timer value [%d, %d]\n",
-	     timer->state, gpio_value_start, gpio_value_end);
-*/
 	gpio_active = gpio_get_value(k->gpios[button].gpio);
 
 	k->timer_started[button] = false;
@@ -226,7 +248,7 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 		dbg("hrtimer_start res: :%d index: %d\n", res, index);
 		k->timer_started[index] = true;
 	} else {
-		dbg("Ignore jitter for k: %p button %d timer started: %d\n", k,
+		dbg("Ignore jitter for k: %p button %d timer started: %d.", k,
 		    index, k->timer_started[index]);
 	}
 	return IRQ_HANDLED;
