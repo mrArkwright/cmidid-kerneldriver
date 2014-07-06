@@ -170,8 +170,10 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 	int gpio_active;	// gpio_value_start, gpio_value_end;
 	unsigned char button;
 
+	/* The following line removes an annoying warning :) */
 	k = NULL;
 	k = get_key_from_timer(timer, &button);
+
 	if (k == NULL) {
 		err("htimer not found \n");
 		return HRTIMER_NORESTART;
@@ -205,6 +207,8 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	int gpio_value_start, gpio_value_end, res;
 
 	ktime_t time = ktime_get();
+	index = 0;
+	k = NULL;
 	get_key_from_irq(irq, &k, &index);
 
 	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
