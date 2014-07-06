@@ -14,6 +14,7 @@
 **/.tmp_versions
 
 module/ioctl_test
+module/strawpi_start_module.sh
 
 presentation/*.orig
 presentation/*.aux

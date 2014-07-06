@@ -52,6 +52,7 @@ struct cmidid_gpio_state {
 };
 
 int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret);
+unsigned char time_to_velocity(s64 stime64);
 
 struct cmidid_gpio_state state;
 
@@ -75,11 +76,8 @@ static void handle_button_event(struct key *k, unsigned char button,
 			note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
-			//calculate velocity
-			timediff = ktime_sub(k->hit_time, ktime_get());
-			//TODO: nice math calculation function
-			velocity = (unsigned char)timediff.tv64 >> 24;
-			//velocity = 100;
+			timediff = ktime_sub(ktime_get(), k->hit_time);
+			velocity = time_to_velocity(timediff.tv64);
 			note_on(k->note, velocity);
 			k->last_velocity = velocity;
 			k->state = KEY_PRESSED;
@@ -90,6 +88,7 @@ static void handle_button_event(struct key *k, unsigned char button,
 			note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
+			note_off(k->note);
 			note_on(k->note, k->last_velocity);
 		}
 		break;
@@ -100,6 +99,18 @@ static void handle_button_event(struct key *k, unsigned char button,
 
 	dbg("key state: %d, button: %d, active: %d, note: %d\n", k->state,
 	    button, active, k->note);
+}
+
+unsigned char time_to_velocity(s64 stime64)
+{
+	uint32_t t;
+	const uint32_t t_max = 1000000;
+	const uint32_t t_min = 1000;
+
+	stime64 = stime64 >> 10;
+	t = (uint32_t) stime64;
+
+	return 127 * (t_max - t) / (t_max - t_min);
 }
 
 int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
@@ -178,7 +189,7 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 
 	info("Timer Button GPIO %d detected as %hhd index: %d\n",
 	     k->gpios[button].gpio, gpio_active, button);
-	handle_button_event(k, button, gpio_active);
+	handle_button_event(k, button, !gpio_active);
 
 	return HRTIMER_NORESTART;
 }

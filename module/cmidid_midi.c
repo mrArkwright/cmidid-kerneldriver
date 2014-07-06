@@ -21,7 +21,7 @@ void note_on(unsigned char note, unsigned char velocity)
 {
 	struct snd_seq_event event;
 
-	dbg("noteon\n");
+	dbg("noteon note: %d, vel: %d\n", note, velocity);
 
 	config_note_event(&event, note, velocity, SNDRV_SEQ_EVENT_NOTEON);
 	dispatch_event(&event);
@@ -31,7 +31,7 @@ void note_off(unsigned char note)
 {
 	struct snd_seq_event event;
 
-	dbg("noteoff\n");
+	dbg("noteoff note: %d\n", note);
 
 	config_note_event(&event, note, 64, SNDRV_SEQ_EVENT_NOTEOFF);
 	dispatch_event(&event);
