@@ -141,12 +141,12 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 	struct key *k;
 	int gpio_value_start, gpio_value_end;
 
+	k = NULL;
 	k = get_key_from_timer(timer);
 	if (k == NULL) {
 		err("htimer not found \n");
 		return HRTIMER_NORESTART;
 	}
-	//send_note(90, 100);
 	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
 	gpio_value_end = gpio_get_value(k->gpios[END_BUTTON].gpio);
 
@@ -161,11 +161,12 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
 	struct key *k;
+	unsigned char index;
 	ktime_t diff;
 	int gpio_value_start, gpio_value_end, res;
 
 	ktime_t time = ktime_get();
-	k = get_key_from_gpio(irq);
+	get_key_from_irq(irq, &k, &index);
 
 	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
 	gpio_value_end = gpio_get_value(k->gpios[END_BUTTON].gpio);
@@ -177,7 +178,6 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	diff = ktime_set(0, jitter_res_time);
 
 	if (k != NULL) {
-		send_note(k->note, 100);
 		res = hrtimer_start(&k->hrtimers[0], diff, HRTIMER_MODE_REL);
 		info("hrtimer_start res: :%d\n", res);
 	}
