@@ -1,3 +1,6 @@
+#include <stdint.h>
+#include <stdio.h>
+
 #include "cmidid_ioctl.h"
 
 int main(int argc, char *argv[])
@@ -11,7 +14,9 @@ int main(int argc, char *argv[])
 		return 2;
 	}
 
-	ioctl(fd, CMIDID_CALIBRATE);
+	uint32_t min_time = ioctl(fd, CMIDID_CALIBRATE_MIN_TIME);
+
+	printf("min time set to %d\n", min_time);
 
 	close(fd);
 
