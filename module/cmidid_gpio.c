@@ -22,6 +22,14 @@ module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
 		 "Mapping of GPIOs to Keys. Format: gpio1a, gpio1b, note1, gpio2a, ...");
 
+static uint32_t stroke_time_min = 1000;
+module_param(stroke_time_min, uint, 0);
+MODULE_PARM_DESC(stroke_time_min, "stroke time for maximal velocity");
+
+static uint32_t stroke_time_max = 1000000;
+module_param(stroke_time_max, uint, 0);
+MODULE_PARM_DESC(stroke_time_max, "stroke time for minimal velocity");
+
 /*
  * The time offset before every MIDI event is sent.
  * Delaying the sending of MIDI events while ignoring subsequent key
@@ -459,8 +467,8 @@ int gpio_init(void)
 	}
 
 	state.last_stroke_time = 100000;
-	state.stroke_time_min = 1000;
-	state.stroke_time_max = 1000000;
+	state.stroke_time_min = stroke_time_min;
+	state.stroke_time_max = stroke_time_max;
 
 	state.vel_curve = VEL_CURVE_LINEAR;
 

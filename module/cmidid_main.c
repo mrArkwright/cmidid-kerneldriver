@@ -129,7 +129,6 @@ static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	case CMIDID_VEL_CURVE_SATURATED:
 		set_vel_curve_saturated();
 		break;
-
 	case CMIDID_TRANSPOSE:
 		return cmidid_transpose(arg);
 		break;
