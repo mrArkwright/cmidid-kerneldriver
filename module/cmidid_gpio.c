@@ -35,6 +35,12 @@ module_param(jitter_res_time, uint, 0);
 MODULE_PARM_DESC(jitter_res_time,
 		 "timing offset before button hits are registered.");
 
+/*
+ * START_BUTTON and END_BUTTON are used to index the GPIO buttons
+ * in every key struct. START_BUTTON is the id for the button
+ * which is hit first when the keyboard key is pressed down.
+ * When the END_BUTTON is hit, the key should be completely pressed down.
+ */
 #define START_BUTTON 0
 #define END_BUTTON 1
 
@@ -54,15 +60,15 @@ typedef enum {
  * One key struct is created for every two GPIO ports/numbers passed via
  * the `gpio_mapping' kernel parameter.
  *
- * KEY_STATE: The state is used to build a state machine like logic for
+ * @KEY_STATE: The state is used to build a state machine like logic for
  *   every button; something like INACTIVE->TOUCHED->PRESSED->INACTIVE...
- * gpios: The two GPIOs which are used to build every button in hardware.
- * irqs: The IRQ numbers for the corresponding GPIOs.
- * hit_time: Time (in ns) when the button was hit/pressed.
- * timer_started: This is used to mitigate the jittering on every GPIO port.
- * hrtimers: Those are used to set a timeout for sending MIDI events.
- * note: The corresponding MIDI note.
- * last_velocity: The velocity (= strength) of the button hit.
+ * @gpios: The two GPIOs which are used to build every button in hardware.
+ * @irqs: The IRQ numbers for the corresponding GPIOs.
+ * @hit_time: Time (in ns) when the button was hit/pressed.
+ * @timer_started: This is used to mitigate the jittering on every GPIO port.
+ * @hrtimers: Those are used to set a timeout for sending MIDI events.
+ * @note: The corresponding MIDI note.
+ * @last_velocity: The velocity (= strength) of the button hit.
  */
 struct key {
 	KEY_STATE state;
@@ -79,8 +85,8 @@ struct key {
  * cmidid_gpio_state:
  *
  * The state of this GPIO component of our kernel module.
- * keys: The array of available keys for our keyboard.
- * num_keys: The total number of available keys.
+ * @keys: The array of available keys for our keyboard.
+ * @num_keys: The total number of available keys.
  *
  * TODO: button_active_high is currently unused. Implement IOCTL.
  */
@@ -95,6 +101,14 @@ unsigned char time_to_velocity(s64 stime64);
 
 struct cmidid_gpio_state state;
 
+/*
+ * handle_button_event: Changes the state of the given key according to the
+ * previous stateand the state of the given button.
+ *
+ * @k: The key which is associated with the current button event.
+ * @button: The id of the button. Can be START_BUTTON or END_BUTTON.
+ * @active: true if the button was pressed.
+ */
 static void handle_button_event(struct key *k, unsigned char button,
 				bool active)
 {
@@ -104,9 +118,11 @@ static void handle_button_event(struct key *k, unsigned char button,
 	switch (k->state) {
 	case KEY_INACTIVE:
 		if ((button == START_BUTTON) && active) {
+			/* First button was hit; button not pressed completely. */
 			k->hit_time = ktime_get();
 			k->state = KEY_TOUCHED;
 		} else if ((button == START_BUTTON) && !active) {
+			/* First buttons was release => key was released. */
 			note_off(k->note);
 		}
 		break;
