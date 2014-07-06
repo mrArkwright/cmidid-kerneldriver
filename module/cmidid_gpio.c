@@ -137,6 +137,16 @@ static struct key *get_key_from_timer(struct hrtimer *timer)
 	return NULL;
 }
 
+static struct gpio *get_gpio_from_timer(struct hrtimer *timer)
+{
+	struct key *k = get_key_from_timer(timer);
+	if (timer == &k->hrtimers[START_BUTTON])
+		return &k->gpios[START_BUTTON];
+	if (timer == &k->hrtimers[END_BUTTON])
+		return &k->gpios[END_BUTTON];
+	return NULL;
+}
+
 enum hrtimer_restart timer_irq(struct hrtimer *timer)
 {
 	struct key *k;
