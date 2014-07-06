@@ -17,7 +17,7 @@ static int gpio_mapping[MAX_REQUEST];
 static int gpio_mapping_size;
 module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
-		 "Mapping of GPIOs to Keys. Format: gpio1, gpio2, note, ...");
+		 "Mapping of GPIOs to Keys. Format: gpio1a, gpio1b, note1, gpio2a, ...");
 
 #define START_BUTTON 0
 #define END_BUTTON 1
@@ -33,7 +33,7 @@ struct key {
 	struct gpio gpios[2];	/* GPIO port for first trigger. */
 	unsigned int irqs[2];
 	s64 hit_time[2];
-	int note;
+	unsigned char note;
 	int last_velocity;
 };
 
@@ -51,6 +51,7 @@ static void handle_button_event(int irq, bool active)
 {
 	struct key *k;
 	unsigned char button;
+	unsigned char velocity;
 
 	if (get_key_from_irq(irq, &k, &button) < 0) {
 		dbg("irq not assigned to key\n");
@@ -59,35 +60,40 @@ static void handle_button_event(int irq, bool active)
 
 	switch (k->state) {
 	case KEY_INACTIVE:
-		if ((button = START_BUTTON) && active) {
+		if ((button == START_BUTTON) && active) {
 			//start counting
 			k->state = KEY_TOUCHED;
-		} else if ((button = START_BUTTON) && !active) {
-			//noteoff
+		} else if ((button == START_BUTTON) && !active) {
+			note_off(k->note);
 		}
 		break;
 	case KEY_TOUCHED:
-		if ((button = START_BUTTON) && !active) {
-			//noteoff
+		if ((button == START_BUTTON) && !active) {
+			note_off(k->note);
 			k->state = KEY_INACTIVE;
-		} else if ((button = END_BUTTON) && active) {
+		} else if ((button == END_BUTTON) && active) {
 			//calculate velocity
-			//noteon
+			velocity = 100;
+			note_on(k->note, velocity);
+			k->last_velocity = velocity;
 			k->state = KEY_PRESSED;
 		}
 		break;
 	case KEY_PRESSED:
-		if ((button = START_BUTTON) && !active) {
-			//noteoff
+		if ((button == START_BUTTON) && !active) {
+			note_off(k->note);
 			k->state = KEY_INACTIVE;
-		} else if ((button = END_BUTTON) && active) {
-			//repeat noteon
+		} else if ((button == END_BUTTON) && active) {
+			note_on(k->note, k->last_velocity);
 		}
 		break;
 	default:
-		//noteoff
+		note_off(k->note);
 		k->state = KEY_INACTIVE;
 	}
+
+	dbg("key state: %d, button: %d, active: %d, note: %d\n", k->state,
+	    button, active, k->note);
 }
 
 int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
@@ -116,13 +122,9 @@ int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
  */
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
-	//struct key *k;
 	info("Interrupt handler called %d: %p.\n", irq, dev_id);
-	/*k = get_key_from_gpio(irq);
 
-	   if (k != NULL) {
-	   send_note(k->note, 100);
-	   } */
+	handle_button_event(irq, true);
 
 	return IRQ_HANDLED;
 }
@@ -180,6 +182,8 @@ int gpio_init(void)
 		k = state.keys + i;
 
 		k->state = KEY_INACTIVE;
+
+		k->last_velocity = 0;
 
 		if (!is_valid(gpio_mapping[3 * i + START_BUTTON])) {
 			err("Invalid gpio: %d\n",
