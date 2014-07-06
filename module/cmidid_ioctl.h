@@ -3,8 +3,14 @@
 
 #include <asm/ioctl.h>
 
-#define CMIDID_CALIBRATE _IO(0, 0)
+#define CMIDID_CALIBRATE_MIN_TIME _IO(0, 0)
+#define CMIDID_CALIBRATE_MAX_TIME _IO(0, 1)
 
-#define CMIDID_TRANSPOSE _IO(0, 1)
+#define CMIDID_VEL_CURVE_LINEAR _IO(0, 2)
+#define CMIDID_VEL_CURVE_CONCAVE _IO(0, 3)
+#define CMIDID_VEL_CURVE_CONVEX _IO(0, 4)
+#define CMIDID_VEL_CURVE_SATURATED _IO(0, 5)
+
+#define CMIDID_TRANSPOSE _IO(0, 6)
 
 #endif

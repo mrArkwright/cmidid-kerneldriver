@@ -1,4 +1,5 @@
 #define DEBUG
+
 #include <linux/gpio.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
@@ -70,6 +71,13 @@ typedef enum {
 	KEY_PRESSED
 } KEY_STATE;
 
+typedef enum {
+	VEL_CURVE_LINEAR,
+	VEL_CURVE_CONCAVE,
+	VEL_CURVE_CONVEX,
+	VEL_CURVE_SATURATED,
+} VEL_CURVE;
+
 /*
  * struct key:
  *
@@ -113,12 +121,53 @@ struct cmidid_gpio_state {
 	struct key *keys;
 	int num_keys;
 	bool button_active_high[2];
+	uint32_t last_stroke_time;
+	uint32_t stroke_time_min;
+	uint32_t stroke_time_max;
+	VEL_CURVE vel_curve;
 };
 
 int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret);
-unsigned char time_to_velocity(s64 stime64);
+static unsigned char time_to_velocity(uint32_t t);
+static uint32_t stime64_to_utime32(s64 stime64);
 
 struct cmidid_gpio_state state;
+
+uint32_t set_min_stroke_time()
+{
+	dbg("min stroke time set to %d\n", state.last_stroke_time);
+	return state.stroke_time_max = state.last_stroke_time;
+}
+
+uint32_t set_max_stroke_time()
+{
+	dbg("max stroke time set to %d\n", state.last_stroke_time);
+	return state.stroke_time_max = state.last_stroke_time;
+}
+
+void set_vel_curve_linear()
+{
+	dbg("velocity curve set to linear\n");
+	state.vel_curve = VEL_CURVE_LINEAR;
+}
+
+void set_vel_curve_concave()
+{
+	dbg("velocity curve set to concave\n");
+	state.vel_curve = VEL_CURVE_CONCAVE;
+}
+
+void set_vel_curve_convex()
+{
+	dbg("velocity curve set to convex\n");
+	state.vel_curve = VEL_CURVE_CONVEX;
+}
+
+void set_vel_curve_saturated()
+{
+	dbg("velocity curve set to saturated\n");
+	state.vel_curve = VEL_CURVE_SATURATED;
+}
 
 /*
  * handle_button_event: Changes the state of the given key according to the
@@ -132,7 +181,7 @@ static void handle_button_event(struct key *k, unsigned char button,
 				bool active)
 {
 	unsigned char velocity;
-	ktime_t timediff;
+	uint32_t timediff;
 
 	/* Switch the last state of the current key. */
 	switch (k->state) {
@@ -155,9 +204,15 @@ static void handle_button_event(struct key *k, unsigned char button,
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
 			/* The second button is hit -> pressed completely. */
-			timediff = ktime_sub(ktime_get(), k->hit_time);
-			velocity = time_to_velocity(timediff.tv64);
+			timediff =
+			    stime64_to_utime32(ktime_sub
+					       (ktime_get(), k->hit_time).tv64);
+
+			state.last_stroke_time = timediff;
+
+			velocity = time_to_velocity(timediff);
 			note_on(k->note, velocity);
+
 			k->last_velocity = velocity;
 			k->state = KEY_PRESSED;
 		}
@@ -193,16 +248,51 @@ static void handle_button_event(struct key *k, unsigned char button,
  *
  * Return: the corresponding velocity.
  */
-unsigned char time_to_velocity(s64 stime64)
+static uint32_t stime64_to_utime32(s64 stime64)
 {
-	uint32_t t;
-	const uint32_t t_max = 1000000;
-	const uint32_t t_min = 1000;
-
 	stime64 = stime64 >> 10;
-	t = (uint32_t) stime64;
+	return (uint32_t) stime64;
+}
 
-	return 127 * (t_max - t) / (t_max - t_min);
+static unsigned char time_to_velocity(uint32_t t)
+{
+	uint32_t a, b, c, t_sat;
+
+	switch (state.vel_curve) {
+	case VEL_CURVE_LINEAR:
+		return 127 * (state.stroke_time_max -
+			      t) / (state.stroke_time_max -
+				    state.stroke_time_min);
+	case VEL_CURVE_CONCAVE:
+		c = 255;
+		a = (-127 * c + c * c) * (state.stroke_time_max -
+					  state.stroke_time_min) / 127;
+		b = (c * state.stroke_time_max + 127 * state.stroke_time_min -
+		     c * state.stroke_time_min);
+		return a / (t - b) + c;
+	case VEL_CURVE_CONVEX:
+		if (t < state.stroke_time_min) {
+			return 127;
+		} else {
+			c = -40;
+			a = (-127 * c + c * c) * (state.stroke_time_max -
+						  state.stroke_time_min) / 127;
+			b = (c * state.stroke_time_max +
+			     127 * state.stroke_time_min -
+			     c * state.stroke_time_min);
+			return a / (t - b) + c;
+		}
+	case VEL_CURVE_SATURATED:
+		c = 140;
+		t_sat =
+		    state.stroke_time_min + (state.stroke_time_max -
+					     state.stroke_time_min) / 2;
+		a = (-127 * c + c * c) * (state.stroke_time_max - t_sat) / 127;
+		b = (c * state.stroke_time_max + 127 * t_sat - c * t_sat);
+		return a / (t - b) + c;
+	}
+
+	return 0;
 }
 
 /*
@@ -367,6 +457,12 @@ int gpio_init(void)
 		err("Failed to allocate memory\n");
 		return -ENOMEM;
 	}
+
+	state.last_stroke_time = 100000;
+	state.stroke_time_min = 1000;
+	state.stroke_time_max = 1000000;
+
+	state.vel_curve = VEL_CURVE_LINEAR;
 
 	for (i = 0; i < state.num_keys; i++) {
 		k = &state.keys[i];

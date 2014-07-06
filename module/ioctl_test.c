@@ -1,3 +1,6 @@
+#include <stdint.h>
+#include <stdio.h>
+
 #include "cmidid_ioctl.h"
 #include <stdio.h>
 
@@ -26,8 +29,8 @@ int main(int argc, char *argv[])
 		err = scanf("%d", &value);
 		switch (value) {
 		case 1:
-			printf("Calibrated to:%ld\n",
-			       ioctl(fd, CMIDID_CALIBRATE));
+			/*uint32_t min_time = ioctl(fd, CMIDID_CALIBRATE_MIN_TIME);
+			   printf("min time set to %d\n", min_time); */
 			break;
 		case 2:
 			printf("Current transpose is %ld add:",
