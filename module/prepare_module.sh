@@ -6,4 +6,4 @@ modprobe snd_virmidi
 rmmod snd_virmidi
 
 killall fluidsynth
-fluidsynth -is -g 5 -a alsa /home/michael/Downloads/TimGM6mb.sf2 &
+fluidsynth -is -g 5 -a alsa /home/pi/TimGM6mb.sf2 &
