@@ -19,7 +19,7 @@ module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
 		 "Mapping of GPIOs to Keys. Format: gpio1a, gpio1b, note1, gpio2a, ...");
 
-static unsigned int jitter_res_time = 100000;
+static unsigned int jitter_res_time = 1000000;
 module_param(jitter_res_time, uint, 0);
 MODULE_PARM_DESC(jitter_res_time,
 		 "timing offset before button hits are registered.");
@@ -133,7 +133,7 @@ static struct key *get_key_from_timer(struct hrtimer *timer,
 			*index = START_BUTTON;
 			return &state.keys[i];
 		}
-		if (&state.keys[i].hrtimers[START_BUTTON] == timer) {
+		if (&state.keys[i].hrtimers[END_BUTTON] == timer) {
 			*index = END_BUTTON;
 			return &state.keys[i];
 		}
@@ -176,8 +176,8 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 
 	k->timer_started[button] = false;
 
-	info("Timer Button GPIO %d detected as %hhd\n", k->gpios[button].gpio,
-	     gpio_active);
+	info("Timer Button GPIO %d detected as %hhd index: %d\n",
+	     k->gpios[button].gpio, gpio_active, button);
 	handle_button_event(k, button, gpio_active);
 
 	return HRTIMER_NORESTART;
@@ -206,11 +206,14 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	diff = ktime_set(0, jitter_res_time);
 
 	if (k != NULL && !k->timer_started[index]) {
-		res = hrtimer_start(&k->hrtimers[0], diff, HRTIMER_MODE_REL);
-		info("hrtimer_start res: :%d\n", res);
+		res =
+		    hrtimer_start(&k->hrtimers[index], diff, HRTIMER_MODE_REL);
+		dbg("hrtimer_start res: :%d index: %d\n", res, index);
 		k->timer_started[index] = true;
+	} else {
+		dbg("Ignore jitter for k: %p button %d timer started: %d\n", k,
+		    index, k->timer_started[index]);
 	}
-
 	return IRQ_HANDLED;
 }
 
@@ -317,6 +320,8 @@ int gpio_init(void)
 			     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		hrtimer_init(&state.keys[i].hrtimers[END_BUTTON],
 			     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+		k->timer_started[START_BUTTON] = false;
+		k->timer_started[END_BUTTON] = false;
 
 		state.keys[i].hrtimers[START_BUTTON].function = &timer_irq;
 		state.keys[i].hrtimers[END_BUTTON].function = &timer_irq;
