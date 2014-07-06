@@ -9,24 +9,36 @@
 #include "cmidid_gpio.h"
 #include "cmidid_midi.h"
 
-extern int num_requested_gpios;
-extern int requested_gpios[MAX_REQUEST];
+/*
+ * GPIOs requested via kernel parameter.
+ * This is a simple list of gpio ids with an corresponding pitch.
+ */
+static int gpio_mapping[MAX_REQUEST];
+static int gpio_mapping_size;
+module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
+MODULE_PARM_DESC(gpio_mapping, "ids for the required gpios.");
 
-#define START 0
-#define END 1
+#define START_BUTTON 0
+#define END_BUTTON 1
 
-struct button {
-	int id;
+typedef enum {
+	KEY_INACTIVE,
+	KEY_TOUCHED,
+	KEY_PRESSED
+} KEY_STATE;
+
+struct key {
+	KEY_STATE state;
 	struct gpio gpios[2];	/* GPIO port for first trigger. */
 	unsigned int irqs[2];
 	s64 hit_time[2];
-	int pitch;
-	int notevelocity;
+	int note;
+	int last_velocity;
 };
 
 struct cmidid_gpio_state {
-	struct button *buttons;
-	int num_buttons;
+	struct key *keys;
+	int num_keys;
 };
 
 struct cmidid_gpio_state state;
@@ -37,14 +49,16 @@ struct cmidid_gpio_state state;
  * Unfortunatly the function `int irq_to_gpio(int irq)'
  * in linux/gpio.h didn't work for me.
  */
-static struct button *get_irq_to_gpio(int irq)
+static struct key *get_key_from_gpio(int irq)
 {
 	int i;
-	for (i = 0; i < state.num_buttons; i++) {
-		if (state.buttons[i].irqs[START] == irq ||
-		    state.buttons[i].irqs[END] == irq)
-			return &state.buttons[i];
+
+	for (i = 0; i < state.num_keys; i++) {
+		if (state.keys[i].irqs[START_BUTTON] == irq ||
+		    state.keys[i].irqs[END_BUTTON] == irq)
+			return &state.keys[i];
 	}
+
 	return NULL;
 }
 
@@ -53,26 +67,27 @@ static struct button *get_irq_to_gpio(int irq)
  */
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
-	struct button *b;
+	struct key *k;
 	info("Interrupt handler called %d: %p.\n", irq, dev_id);
-	b = get_irq_to_gpio(irq);
+	k = get_key_from_gpio(irq);
 
-	if (b != NULL) {
-		send_note(b->pitch, 100);
+	if (k != NULL) {
+		send_note(k->note, 100);
 	}
+
 	return IRQ_HANDLED;
 }
 
 static bool is_valid(int gpio)
 {
 	int i;
-	for (i = 0; i < state.num_buttons; i++) {
-		if (gpio == state.buttons[i].gpios[START].gpio) {
+	for (i = 0; i < state.num_keys; i++) {
+		if (gpio == state.keys[i].gpios[START_BUTTON].gpio) {
 			dbg("gpio: %d is invalid. It was already used...\n",
 			    gpio);
 			return false;
 		}
-		if (gpio == state.buttons[i].gpios[END].gpio) {
+		if (gpio == state.keys[i].gpios[END_BUTTON].gpio) {
 			dbg("gpio: %d is invalid. It was already used...\n",
 			    gpio);
 			return false;
@@ -84,87 +99,118 @@ static bool is_valid(int gpio)
 
 int gpio_init(void)
 {
-	int i, j, err;
+	int err;
+	int i;
+	struct key *k;
+	unsigned int irq;
 
 	dbg("GPIO component initializing...\n");
-	dbg("%d GPIOs requested.\n", num_requested_gpios);
+
 	/* Drop if the array length is invalid. */
-	if ((err = num_requested_gpios) <= 0) {
-		err("Unable to request gpio. num_requested_gpios = %d\n", err);
+	if (gpio_mapping_size <= 0) {
+		err("No GPIO_Mapping specified\n");
 		return -EINVAL;
 	}
+
 	/* Drop if array length is not a multiple of three. */
-	if (num_requested_gpios % 3 != 0) {
-		err("Unable to parse gpios/pitches. num_requested_gpios %% 3 != 0\n");
+	if (gpio_mapping_size % 3 != 0) {
+		err("Invalid GPIO-Mapping. Argument number not a multiple of 3. Format: gpio1, gpio2, key, ...\n");
 		return -EINVAL;
 	}
 
 	/* Allocate one button struct for every pair of gpios with pitch. */
-	state.num_buttons = num_requested_gpios / 3;
-	state.buttons =
-	    kzalloc(state.num_buttons * sizeof(struct button), GFP_KERNEL);
+	state.num_keys = gpio_mapping_size / 3;
+	state.keys = kzalloc(state.num_keys * sizeof(struct key), GFP_KERNEL);
 
-	if (state.buttons < 0) {
-		err("%p. Could not allocate space state.buttons.",
-		    state.buttons);
+	if (state.keys == NULL) {
+		err("Failed to allocate memory\n");
 		return -ENOMEM;
 	}
 
-	for (i = 0; i < state.num_buttons; i++) {
-		err = -EINVAL;
-		state.buttons[i].id = i;
-		for (j = 0; j < 2; j++) {
-			if (!is_valid(requested_gpios[3 * i + j])) {
-				err("%d. Invalid gpio: %d\n", err,
-				    requested_gpios[3 * i + j]);
-				goto free_buttons;
-			}
-			state.buttons[i].gpios[j].gpio =
-			    requested_gpios[3 * i + j];
-			state.buttons[i].gpios[j].flags = GPIO_MODE;
-			state.buttons[i].gpios[j].label = "NO_LABEL";
-		}
+	for (i = 0; i < state.num_keys; i++) {
+		k = state.keys + i;
 
-		state.buttons[i].pitch = requested_gpios[3 * i + 2];
-		dbg("Setting button %d: gpio_start = %d, gpio_end = %d, "
-		    "pitch = %d\n", i, state.buttons[i].gpios[START].gpio,
-		    state.buttons[i].gpios[END].gpio, state.buttons[i].pitch);
+		k->state = KEY_INACTIVE;
 
-		if ((err = gpio_request_array(state.buttons[i].gpios, 2)) < 0) {
-			err("%d. Could not request gpio %d or %d.",
-			    err, state.buttons[i].gpios[START].gpio,
-			    state.buttons[i].gpios[END].gpio);
+		if (!is_valid(gpio_mapping[3 * i + START_BUTTON])) {
+			err("Invalid gpio: %d\n",
+			    gpio_mapping[3 * i + START_BUTTON]);
+			err = -EINVAL;
 			goto free_buttons;
 		}
-		for (j = 0; j < 2; j++) {
-			if ((err =
-			     gpio_to_irq(state.buttons[i].gpios[j].gpio)) < 0) {
-				err("Could not request irq for gpio %d.\n",
-				    state.buttons[i].gpios[j].gpio);
-				goto free_buttons;
-			}
-			state.buttons[i].irqs[j] = err;
+		k->gpios[START_BUTTON].gpio =
+		    gpio_mapping[3 * i + START_BUTTON];
+		k->gpios[START_BUTTON].flags = GPIO_MODE;
+		k->gpios[START_BUTTON].label = "NO_LABEL";
+
+		if (!is_valid(gpio_mapping[3 * i + END_BUTTON])) {
+			err("Invalid gpio: %d\n",
+			    gpio_mapping[3 * i + END_BUTTON]);
+			err = -EINVAL;
+			goto free_buttons;
 		}
-		for (j = 0; j < 2; j++) {
-			if ((err =
-			     request_irq(state.buttons[i].irqs[j], irq_handler,
-					 IRQ_TRIGGER, "irq_start", NULL)) < 0) {
-				err("Could not request irq for button %d.\n",
-				    state.buttons[i].id);
-				goto free_buttons;
-			}
+		k->gpios[END_BUTTON].gpio = gpio_mapping[3 * i + END_BUTTON];
+		k->gpios[END_BUTTON].flags = GPIO_MODE;
+		k->gpios[END_BUTTON].label = "NO_LABEL";
+
+		k->note = gpio_mapping[3 * i + 2];
+
+		dbg("Setting key: gpio_start = %d, gpio_end = %d, note = %d\n",
+		    k->gpios[START_BUTTON].gpio, k->gpios[END_BUTTON].gpio,
+		    k->note);
+
+		if ((err = gpio_request_array(k->gpios, 2)) < 0) {
+			err("Could not request gpio %d or %d.",
+			    k->gpios[START_BUTTON].gpio,
+			    k->gpios[END_BUTTON].gpio);
+			goto free_buttons;
 		}
 
+		irq = gpio_to_irq(k->gpios[START_BUTTON].gpio);
+		if (irq < 0) {
+			err("Could not request irq for gpio %d.\n",
+			    k->gpios[START_BUTTON].gpio);
+			err = irq;
+			goto free_buttons;
+		}
+		k->irqs[START_BUTTON] = irq;
+
+		irq = gpio_to_irq(k->gpios[END_BUTTON].gpio);
+		if (irq < 0) {
+			err("Could not request irq for gpio %d.\n",
+			    k->gpios[END_BUTTON].gpio);
+			err = irq;
+			goto free_buttons;
+		}
+		k->irqs[END_BUTTON] = irq;
+
+		if ((err =
+		     request_irq(k->irqs[START_BUTTON], irq_handler,
+				 IRQ_TRIGGER, "irq_start", NULL)) < 0) {
+			err("Could not request irq for key.\n");
+			err = -EINVAL;
+			goto free_buttons;
+		}
+
+		if ((err =
+		     request_irq(k->irqs[END_BUTTON], irq_handler, IRQ_TRIGGER,
+				 "irq_start", NULL)) < 0) {
+			err("Could not request irq for key.\n");
+			err = -EINVAL;
+			goto free_buttons;
+		}
 	}
+
 	return 0;
 
  free_buttons:
 
 	for (--i; i > 0; --i) {
-		gpio_free_array(state.buttons[i].gpios, 2);
+		gpio_free_array(state.keys[i].gpios, 2);
 	}
 
-	kfree(state.buttons);
+	kfree(state.keys);
+
 	return err;
 }
 
@@ -173,10 +219,11 @@ void gpio_exit(void)
 	int i;
 	dbg("GPIO component exiting...\n");
 
-	for (i = 0; i < state.num_buttons; i++) {
-		free_irq(state.buttons[i].irqs[START], NULL);
-		free_irq(state.buttons[i].irqs[END], NULL);
-		gpio_free_array(state.buttons[i].gpios, 2);
+	for (i = 0; i < state.num_keys; i++) {
+		free_irq(state.keys[i].irqs[START_BUTTON], NULL);
+		free_irq(state.keys[i].irqs[END_BUTTON], NULL);
+		gpio_free_array(state.keys[i].gpios, 2);
 	}
-	kfree(state.buttons);
+
+	kfree(state.keys);
 }
