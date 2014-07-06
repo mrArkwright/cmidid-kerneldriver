@@ -19,8 +19,6 @@ module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
 		 "Mapping of GPIOs to Keys. Format: gpio1, gpio2, note, ...");
 
-int get_key_from_gpio(struct key **k_ret, unsigned char *button_ret);
-
 #define START_BUTTON 0
 #define END_BUTTON 1
 
@@ -45,6 +43,8 @@ struct cmidid_gpio_state {
 	bool button_active_high[2];
 };
 
+int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret);
+
 struct cmidid_gpio_state state;
 
 static void handle_button_event(int irq, bool active)
@@ -52,7 +52,7 @@ static void handle_button_event(int irq, bool active)
 	struct key *k;
 	unsigned char button;
 
-	if (get_key_from_gpio(&k, &button) < 0) {
+	if (get_key_from_irq(irq, &k, &button) < 0) {
 		dbg("irq not assigned to key\n");
 		return;
 	}
@@ -90,7 +90,7 @@ static void handle_button_event(int irq, bool active)
 	}
 }
 
-int get_key_from_gpio(struct key **k_ret, unsigned char *button_ret)
+int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 {
 	struct key *k;
 
