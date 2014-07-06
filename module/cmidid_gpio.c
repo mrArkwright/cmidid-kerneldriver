@@ -38,6 +38,7 @@ struct key {
 	struct gpio gpios[2];	/* GPIO port for first trigger. */
 	unsigned int irqs[2];
 	s64 hit_time[2];
+	bool timer_started[2];
 	struct hrtimer hrtimers[2];
 	unsigned char note;
 	int last_velocity;
@@ -152,6 +153,7 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 
 	info("TIMER Interrupt handler called %lu: timer value [%d, %d]\n",
 	     timer->state, gpio_value_start, gpio_value_end);
+
 	return HRTIMER_NORESTART;
 }
 
@@ -177,9 +179,10 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	//TODO: into global space :
 	diff = ktime_set(0, jitter_res_time);
 
-	if (k != NULL) {
+	if (k != NULL && !k->timer_started[index]) {
 		res = hrtimer_start(&k->hrtimers[0], diff, HRTIMER_MODE_REL);
 		info("hrtimer_start res: :%d\n", res);
+		k->timer_started[index]=true;
 	}
 	handle_button_event(irq, true);
 
