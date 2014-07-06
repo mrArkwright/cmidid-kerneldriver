@@ -23,7 +23,7 @@ MODULE_PARM_DESC(gpio_mapping,
 
 /*
  * The time offset before every MIDI event is sent.
- * Delaying the sending of MIDI events while ignoring subsequent button
+ * Delaying the sending of MIDI events while ignoring subsequent key
  * hits within the this time period can be used to counter button jittering.
  *
  * According to some testing we did, this value should be at least ~500us
@@ -40,12 +40,29 @@ MODULE_PARM_DESC(jitter_res_time,
  * in every key struct. START_BUTTON is the id for the button
  * which is hit first when the keyboard key is pressed down.
  * When the END_BUTTON is hit, the key should be completely pressed down.
+ * Somwhat like this:
+ *
+ *   |  |
+ *   v  v  v
+ *  +--------------+
+ *  | keyboard key | The key is fixed on this side :)
+ *  +..............+=========
+ *
+ *   .---.    .---.
+ *    end     start
+ *
+ * Example usage: state.keys[i].gpios[START_BUTTON].gpio ...
  */
 #define START_BUTTON 0
 #define END_BUTTON 1
 
 /*
- * Possible states for every button of our MIDI keyboard.
+ * Possible states for every key of our MIDI keyboard.
+ * These values are used in `handle_button_event'.
+ *
+ * @KEY_INACTIVE: The key is not touched or pressed.
+ * @KEY_TOUCHED: The first button of the key is hit/pressed down.
+ * @KEY_PRESSED: The second button is hit, so the key is completely pressed.
  */
 typedef enum {
 	KEY_INACTIVE,
@@ -56,7 +73,9 @@ typedef enum {
 /*
  * struct key:
  *
- * This struct represents a single button for an abstract MIDI keyboard.
+ * This struct represents a single key for an abstract MIDI keyboard.
+ * Each of those keys is associated with two buttons/triggers which are
+ * connected to two different GPIO ports of the machine.
  * One key struct is created for every two GPIO ports/numbers passed via
  * the `gpio_mapping' kernel parameter.
  *
@@ -115,22 +134,27 @@ static void handle_button_event(struct key *k, unsigned char button,
 	unsigned char velocity;
 	ktime_t timediff;
 
+	/* Switch the last state of the current key. */
 	switch (k->state) {
 	case KEY_INACTIVE:
+		/* The key was inactive (not pressed in any way) previously. */
 		if ((button == START_BUTTON) && active) {
-			/* First button was hit; button not pressed completely. */
+			/* First button was hit -> button not pressed completely. */
 			k->hit_time = ktime_get();
 			k->state = KEY_TOUCHED;
 		} else if ((button == START_BUTTON) && !active) {
-			/* First buttons was release => key was released. */
+			/* First buttons was release -> key was released. */
 			note_off(k->note);
 		}
 		break;
 	case KEY_TOUCHED:
+		/* Only the first button of the key was pressed previously. */
 		if ((button == START_BUTTON) && !active) {
+			/* The first button is released -> not pressed. */
 			note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
+			/* The second button is hit -> pressed completely. */
 			timediff = ktime_sub(ktime_get(), k->hit_time);
 			velocity = time_to_velocity(timediff.tv64);
 			note_on(k->note, velocity);
@@ -139,10 +163,15 @@ static void handle_button_event(struct key *k, unsigned char button,
 		}
 		break;
 	case KEY_PRESSED:
+		/* The key was fully pressed down previously. */
 		if ((button == START_BUTTON) && !active) {
+			/* The first button was released -> not pressed.
+			 * Note: This shouldn't happen (?) for a real key.
+			 */
 			note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
+			/* The second button was hit again. */
 			note_off(k->note);
 			note_on(k->note, k->last_velocity);
 		}
@@ -156,6 +185,14 @@ static void handle_button_event(struct key *k, unsigned char button,
 	    button, active, k->note);
 }
 
+/*
+ * time_to_velocity: Returns a MIDI velocity value between 0 and 127
+ * for a given key hit time (in ns).
+ *
+ * @stime64: signed 64bit integer representing a time value in nanoseconds.
+ *
+ * Return: the corresponding velocity.
+ */
 unsigned char time_to_velocity(s64 stime64)
 {
 	uint32_t t;
@@ -168,6 +205,15 @@ unsigned char time_to_velocity(s64 stime64)
 	return 127 * (t_max - t) / (t_max - t_min);
 }
 
+/*
+ * get_key_from_irq: Sets the key struct and the button index for a given irq.
+ *
+ * @irq: The IRQ value which is used to find the enclosing key struct.
+ * @key_ret: This pointer will be set to the struct containing irq.
+ * @button_ret: The index of the button/irq will be written into this char.
+ *
+ * Return: 0 if a struct could be found, -1 otherwise.
+ */
 int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 {
 	struct key *k;
@@ -189,6 +235,9 @@ int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 	return -1;
 }
 
+/*
+ * TODO: Document.
+ */
 static struct key *get_key_from_timer(struct hrtimer *timer,
 				      unsigned char *index)
 {

@@ -4,7 +4,7 @@
 void print_options()
 {
 	printf("You can set different options for the cmidid device:\n"
-	       "[1] Calibrate\n" "[2] Transpose\n");
+	       "[1] Calibrate\n" "[2] Transpose\nOption:");
 }
 
 int main(int argc, char *argv[])
@@ -22,17 +22,22 @@ int main(int argc, char *argv[])
 
 	err = 1;
 	while (err == 1) {
-		err = scanf("Option:%d\n", &value);
+		print_options();
+		err = scanf("%d", &value);
 		switch (value) {
 		case 1:
 			printf("Calibrated to:%ld\n",
 			       ioctl(fd, CMIDID_CALIBRATE));
 			break;
 		case 2:
-			printf("Current transpose is %d add:",
-			       ioctl(fd, CMIDID_TRANSPOSE, 0));
-			err = scanf("%d\n", &value);
-			ioctl(fd, CMIDID_TRANSPOSE, value);
+			printf("Current transpose is %ld add:",
+			       ioctl(fd, CMIDID_TRANSPOSE, 0) - 128);
+			err = scanf("%d", &value);
+			printf("\nTranspose set to:%ld\n",
+			       ioctl(fd, CMIDID_TRANSPOSE, value) - 128);
+			break;
+		default:
+			printf("Unknown option");
 			break;
 		}
 	}

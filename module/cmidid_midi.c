@@ -9,19 +9,20 @@
 
 #include "cmidid_main.h"
 
-unsigned long transposed = 0;
+long transposed = 0;
 
 struct snd_card *card;
 static int client = 0;
 
-long transpose(unsigned long arg)
+long cmidid_transpose(unsigned long arg)
 {
-	transposed += arg;
+	dbg("transpose %lu\n", arg);
+	transposed = transposed + arg;
 	if (transposed < -127)
 		transposed = -127;
 	else if (transposed > 127)
 		transposed = 127;
-	return transposed;
+	return transposed + 128;
 }
 
 static void config_note_event(struct snd_seq_event *event, unsigned char note,

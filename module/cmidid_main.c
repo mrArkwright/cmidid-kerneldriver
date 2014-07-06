@@ -110,13 +110,15 @@ static void __exit cmidid_exit(void)
 
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
+
+	dbg("ioctl called with: %d\n", cmd);
 	switch (cmd) {
 	case CMIDID_CALIBRATE:
 		dbg("calibrating now\n");
 		break;
 
 	case CMIDID_TRANSPOSE:
-		return transpose(arg);
+		return cmidid_transpose(arg);
 		break;
 	default:
 		dbg("unknown ioctl command\n");
