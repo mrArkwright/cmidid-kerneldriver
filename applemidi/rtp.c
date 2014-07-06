@@ -447,7 +447,10 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
   struct sockaddr_in *a;
   
   mm_segment_t oldfs;
-  
+
+	//debug:
+int i, j; 
+ 
   pr_debug("RTP send message\n");
   
   if( info == NULL || info->peer == NULL ) return 1;
@@ -484,7 +487,6 @@ int RTPSessionSendPacket( struct RTPSession * session, struct RTPPacketInfo * in
   }
 
   pr_debug("RTP Sending RTP message consisting of %i iovecs.\n", (int) iovlen );
-  int i, j;
   for( i=0; i<iovlen; i++ ) {
     pr_debug("[%i] iov_len: %i, iov_base: %p\n", i, (int) iov[i].iov_len, iov[i].iov_base );
     for( j=0; j<iov[i].iov_len; j++ ) {

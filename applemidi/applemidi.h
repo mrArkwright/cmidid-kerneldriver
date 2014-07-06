@@ -46,7 +46,7 @@ struct AppleMIDICommand {
 
 
 struct MIDIDriverAppleMIDI {
-    spinlock_t lock
+    	spinlock_t lock;
 	struct MIDIDriver base;
 	struct socket *control_socket;
 	struct socket *rtp_socket;

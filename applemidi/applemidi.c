@@ -23,7 +23,9 @@
 
 struct MIDIDriverAppleMIDI *raspi;
 
+int port=5008;
 
+module_param(port, int, 0);
 
 
 /**
@@ -438,7 +440,7 @@ static void _socket_callback(struct sock *sk, int bytes)
 				//test if possible now:
                 if(spin_trylock(&(driver->lock)))
                 {
-                    pr_debug("allowed (lock not taken)\n")
+                    pr_debug("allowed (lock not taken)\n");
                     if( _applemidi_recv_command( driver, skb , &(driver->command) ) == 0)
     				{
     					pr_debug("reply to command\n");
@@ -706,10 +708,6 @@ void MIDIDriverAppleMIDIDestroy(struct MIDIDriverAppleMIDI *driver)
 
 static int __init mod_init(void)
 {
-	int port=5008;
-    
-    module_param(port, int, 0);
-    
 	pr_info("initializing applemidi\n");
 	raspi = MIDIDriverAppleMIDICreate("kernel", port);
 	if (raspi == NULL) {
