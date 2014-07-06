@@ -529,7 +529,7 @@ control_fail:
 	return result;
 }
 
-static int _applemidi_endsession(struct MIDIDriverAppleMIDI *driver, sock *sk,
+static int _applemidi_endsession(struct MIDIDriverAppleMIDI *driver, struct sock *sk,
 				 int size, struct sockaddr_in *addr)
 {
 	if (addr != (struct sockaddr_in *)&(driver->command.addr))
@@ -595,10 +595,10 @@ void _applemidi_idle_timeout(unsigned long data)
 	struct sockaddr_in *addr;
 	int size;
 
-	pr_debug("====called timeout (%ld) dat: %x ====\n", jiffies, data);
-
 	struct MIDIDriverAppleMIDI *driver = (struct MIDIDriverAppleMIDI *)data;
 	mod_timer(&driver->timer, jiffies + msecs_to_jiffies(1500));
+
+	pr_debug("====called timeout (%ld) dat: %lx ====\n", jiffies, data);
 
 	if (spin_trylock(&(driver->lock))) {
 		RTPSessionNextPeer(driver->rtp_session, &(driver->peer));
