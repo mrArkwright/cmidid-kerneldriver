@@ -6,47 +6,57 @@
 
 #include "midi.h"
 
-#define APPLEMIDI_PROTOCOL_SIGNATURE          0xffff
+#define APPLEMIDI_PROTOCOL_SIGNATURE 0xffff
 
-#define APPLEMIDI_COMMAND_INVITATION          0x494e /** "IN" on control & rtp port */
-#define APPLEMIDI_COMMAND_INVITATION_REJECTED 0x4e4f /** "NO" on control & rtp port */
-#define APPLEMIDI_COMMAND_INVITATION_ACCEPTED 0x4f4b /** "OK" on control & rtp port */
-#define APPLEMIDI_COMMAND_ENDSESSION          0x4259 /** "BY" on control port */
-#define APPLEMIDI_COMMAND_SYNCHRONIZATION     0x434b /** "CK" on rtp port */
-#define APPLEMIDI_COMMAND_RECEIVER_FEEDBACK   0x5253 /** "RS" on control port */
+/* "IN" on control & rtp port */
+#define APPLEMIDI_COMMAND_INVITATION 0x494e
+/* "NO" on control & rtp port */
+#define APPLEMIDI_COMMAND_INVITATION_REJECTED 0x4e4f
+/* "OK" on control & rtp port */
+#define APPLEMIDI_COMMAND_INVITATION_ACCEPTED 0x4f4b
+/* "BY" on control port */
+#define APPLEMIDI_COMMAND_ENDSESSION 0x4259
+/* "CK" on rtp port */
+#define APPLEMIDI_COMMAND_SYNCHRONIZATION 0x434b
+/* "RS" on control port */
+#define APPLEMIDI_COMMAND_RECEIVER_FEEDBACK 0x5253
 
-
-struct AppleMIDICommand {
-	struct RTPPeer *peer;	/* use peers sockaddr instead .. we get
-				 * initialization problems otherwise */
+struct AppleMIDICommand
+{
+	struct RTPPeer *peer; /* use peers sockaddr instead .. we get
+			       * initialization problems otherwise */
 	struct sockaddr_in addr;
 	int size;
 	/* unsigned short channel; */
 	unsigned short type;
-	union {
-		struct {
+	union
+	{
+		struct
+		{
 			unsigned long version;
 			unsigned long token;
 			unsigned long ssrc;
 			char name[64];
 		} session;
-		struct {
+		struct
+		{
 			unsigned long ssrc;
 			unsigned long count;
 			unsigned long long timestamp1;
 			unsigned long long timestamp2;
 			unsigned long long timestamp3;
 		} sync;
-		struct {
+		struct
+		{
 			unsigned long ssrc;
 			unsigned long seqnum;
 		} feedback;
 	} data;
 };
 
-
-struct MIDIDriverAppleMIDI {
-    	spinlock_t lock;
+struct MIDIDriverAppleMIDI
+{
+	spinlock_t lock;
 	struct MIDIDriver base;
 	struct socket *control_socket;
 	struct socket *rtp_socket;
@@ -55,7 +65,7 @@ struct MIDIDriverAppleMIDI {
 	unsigned char sync;
 	unsigned long token;
 	char name[32];
-	
+
 	struct timer_list timer;
 
 	struct AppleMIDICommand command;
