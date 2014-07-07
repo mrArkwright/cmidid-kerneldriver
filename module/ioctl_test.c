@@ -24,6 +24,8 @@ int main(int argc, char *argv[])
 	int err = 0;
 	uint32_t min_time;
 
+	fd = open(file_name, 0);
+
 	if (fd == -1) {
 		perror("open /dev/cmidid failed\n");
 		return 2;
