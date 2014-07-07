@@ -22,10 +22,19 @@ module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
 		 "Mapping of GPIOs to Keys. Format: gpio1a, gpio1b, note1, gpio2a, ...");
 
+/*
+ * The minimum time difference between two subsequent button presses which
+ * results in the maximum velocity (127) for the buttton press.
+ */
 static uint32_t stroke_time_min = 1000;
 module_param(stroke_time_min, uint, 0);
 MODULE_PARM_DESC(stroke_time_min, "stroke time for maximal velocity");
 
+/*
+ * The time differnence between two button hits for a single key which
+ * which results in the minimum (0) velocity for the sent MIDI note.
+ * Press times above this value will return the minium velocity, too.
+ */
 static uint32_t stroke_time_max = 1000000;
 module_param(stroke_time_max, uint, 0);
 MODULE_PARM_DESC(stroke_time_max, "stroke time for minimal velocity");
@@ -79,6 +88,10 @@ typedef enum {
 	KEY_PRESSED
 } KEY_STATE;
 
+/*
+ * VEL_CURVE: The types of interpolation curves used to calculate the
+ * velocity for every noteon MIDI event.
+ */
 typedef enum {
 	VEL_CURVE_LINEAR,
 	VEL_CURVE_CONCAVE,
@@ -262,6 +275,16 @@ static uint32_t stime64_to_utime32(s64 stime64)
 	return (uint32_t) stime64;
 }
 
+/*
+ * time_to_velocity: Returns a MIDI velocity value between (usually 0 and 127)
+ * for a given time in nanoseconds. This should probably be the time delay
+ * between two successive button hits for a single key.
+ *
+ * @t: time value in ns
+ *
+ * Return: The calculated velocity. Values < 0 are results of failed 
+ *         calculations.
+ */
 static unsigned char time_to_velocity(uint32_t t)
 {
 	uint32_t a, b, c, t_sat;
@@ -334,7 +357,14 @@ int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 }
 
 /*
- * TODO: Document.
+ * get_key_from_timer: Helper function to get the enclosing key struct
+ * and the button index for a given hrtimer pointer.
+ *
+ * @timer: Pointer which is used to find the enclosing key struct.
+ * @index: The index of the corresponding button is written to this location.
+ *
+ * Return: The pointer to the struct which contains `timer' or NULL if no
+ * such struct could be found.
  */
 static struct key *get_key_from_timer(struct hrtimer *timer,
 				      unsigned char *index)
@@ -355,6 +385,16 @@ static struct key *get_key_from_timer(struct hrtimer *timer,
 	return NULL;
 }
 
+/*
+ * timer_irq: The interrupt handler routine reads the GPIO values to
+ * determine the state of the corresponding button and subsequently callsx 
+ * handle_button_event. This function is delayed for a fixed time after
+ * the interrupt on the GPIO port is registered.
+ *
+ * @timer: hrtimer that uses this function as a callback
+ *
+ * Return: HRTIMER_NORESTART; the timer has to be reset manually.
+ */
 enum hrtimer_restart timer_irq(struct hrtimer *timer)
 {
 	struct key *k;
@@ -372,17 +412,29 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 
 	gpio_active = gpio_get_value(k->gpios[button].gpio);
 
+	/* Reset the flag, so that new interrupts will be registered. */
 	k->timer_started[button] = false;
 
-	info("Timer Button GPIO %d detected as %hhd index: %d\n",
-	     k->gpios[button].gpio, gpio_active, button);
+	dbg("Timer Button GPIO %d detected as %hhd index: %d\n",
+	    k->gpios[button].gpio, gpio_active, button);
 	handle_button_event(k, button, !gpio_active);
 
 	return HRTIMER_NORESTART;
 }
 
 /*
- * The interrupt handler for every GPIO interrupt.
+ * irq_handler: The interrupt handler for every GPIO interrupt.
+ * This function is called when a rising/falling edge is registered on the
+ * GPIO port corresponding to the given IRQ number.
+ *
+ * Software resolution of jittering/bouncing is achieved by delaying the
+ * read on the GPIO port by a fixed amount of time. Other interrupts for
+ * this port are ignored during this period of time.
+ *
+ * @irq: The number of the IRQ which is resposible for calling this function.
+ * @dev_id: I have no idea :) Look at linux/interrupt.h.
+ *
+ * Return: IRQ_HANDLED
  */
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
@@ -396,16 +448,17 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	k = NULL;
 	get_key_from_irq(irq, &k, &index);
 
+	/* Only for debugging purposes: */
 	gpio_value_start = gpio_get_value(k->gpios[START_BUTTON].gpio);
 	gpio_value_end = gpio_get_value(k->gpios[END_BUTTON].gpio);
 
-	info("Interrupt handler called %d: gpio value [%d, %d]. (%lld ns)\n",
-	     irq, gpio_value_start, gpio_value_end, time.tv64);
+	dbg("Interrupt handler called %d: gpio value [%d, %d]. (%lld ns)\n",
+	    irq, gpio_value_start, gpio_value_end, time.tv64);
 
-	//TODO: into global space :
 	diff = ktime_set(0, jitter_res_time);
 
 	if (k != NULL && !k->timer_started[index]) {
+		/* Call the timer_irq delayed and "lock" the interrupt handler. */
 		res =
 		    hrtimer_start(&k->hrtimers[index], diff, HRTIMER_MODE_REL);
 		dbg("hrtimer_start res: :%d index: %d\n", res, index);
@@ -417,6 +470,15 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+/*
+ * is_valid: Checks if a given GPIO number is already used for a key struct
+ * or if the GPIO number is greater than the number of GPIOs available for
+ * the current machine.
+ *
+ * @gpio: The GPIO number to be checked.
+ *
+ * Return: true is the number is a valid GPIO; false otherwise
+ */
 static bool is_valid(int gpio)
 {
 	int i;
@@ -436,6 +498,12 @@ static bool is_valid(int gpio)
 	return gpio_is_valid(gpio);
 }
 
+/*
+ * gpio_init: Initialization routine for the GPIO component of the CMIDID
+ * kernel driver. This will be called by cmidid_init.
+ *
+ * Return: A Linux error code.
+ */
 int gpio_init(void)
 {
 	int i;
@@ -472,6 +540,7 @@ int gpio_init(void)
 
 	state.vel_curve = VEL_CURVE_LINEAR;
 
+	/* Initialize the state and key structs. */
 	for (i = 0; i < state.num_keys; i++) {
 		k = &state.keys[i];
 
@@ -522,6 +591,11 @@ int gpio_init(void)
 		}
 		k->irqs[START_BUTTON] = irq;
 
+		/* Make sure that the timer init is called before 
+		 * requesting the irqs. That's because request_irq calls
+		 * the `irq_handler' function immediately (which uses the
+		 * hrtimer).
+		 */
 		hrtimer_init(&state.keys[i].hrtimers[START_BUTTON],
 			     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		hrtimer_init(&state.keys[i].hrtimers[END_BUTTON],
@@ -565,6 +639,7 @@ int gpio_init(void)
 
  free_buttons:
 
+	/* Free in reverse order. */
 	for (--i; i > 0; --i) {
 		gpio_free_array(state.keys[i].gpios, 2);
 		hrtimer_cancel(&state.keys[i].hrtimers[END_BUTTON]);
@@ -576,6 +651,10 @@ int gpio_init(void)
 	return err;
 }
 
+/*
+ * gpio_exit: Exit/cleanup routine called by the __exit routine of the
+ * actual module. Definitely, free everything here.
+ */
 void gpio_exit(void)
 {
 	int i;
