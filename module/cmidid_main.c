@@ -24,6 +24,7 @@ module_exit(cmidid_exit);
 
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg);
 
+/* We are only using ioctl and not read, write, etc. */
 static struct file_operations cmidid_fops = {
 	.unlocked_ioctl = cmidid_ioctl,
 };
@@ -33,6 +34,11 @@ static struct cdev *cmidid_driver_object;
 static struct class *cmidid_class;
 struct device *cmidid_device;
 
+/*
+ * cmidid_inti: Init routine; called by the kernel.
+ *
+ * Return: An appropriate Linux error code.
+ */
 static int __init cmidid_init(void)
 {
 	int err;
@@ -75,6 +81,7 @@ static int __init cmidid_init(void)
 
 	return 0;
 
+/* Call exit/cleanup routines in reverse order. */
  err_gpio_init:
 	midi_exit();
 
@@ -92,6 +99,12 @@ static int __init cmidid_init(void)
 	return err;
 }
 
+/*
+ * cmidid_exit: Exit/cleanup routine; called by the kernel.
+ *
+ * Note: If cmidid_init fails, the module unloads directly and `cmidid_exit'
+ * is never called.
+ */
 static void __exit cmidid_exit(void)
 {
 	dbg("Module exiting...\n");
@@ -108,6 +121,15 @@ static void __exit cmidid_exit(void)
 	unregister_chrdev_region(cmidid_dev_number, 1);
 }
 
+/*
+ * cmidid_ioctl: ioctl callback function.
+ *
+ * @f: pointer to cmidid file; /dev/cmidid
+ * @cmd: ioctl command encoded in a single byte.
+ * @arg: unspecified number of additional arguments
+ *
+ * Returns: 0 if the command handling was successful;
+ */
 static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 

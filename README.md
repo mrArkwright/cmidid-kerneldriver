@@ -1,6 +1,8 @@
-cmidid-kerneldriver
-===================
-Felix: nmj Einbindung. Mit Java Midi Gerät auslesen.
-Andreas: GPIO port Interrupts und auslesen
-Michael: Timer Handling. Möglichst genau für Velocity
-Jannik: midi Device erstellen und Daten schicken
+### cmidid-kerneldriver & linux applemidi
+
+An experimental Linux kernel driver which can be used to build custom MIDI
+keyboards with breadboards, jump wires and buttons.
+
+This repositoy includes another kernel driver which implements the RTP MIDI
+(aka AppleMIDI) realtime protocol.
+
