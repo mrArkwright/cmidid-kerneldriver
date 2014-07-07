@@ -12,8 +12,22 @@
 long transposed = 0;
 
 struct snd_card *card;
+
+/*
+* Client number of alsas sequencer also shown in aconnect
+*/
 static int client = 0;
 
+/**
+* cmidid_transpose: 
+* 
+* Reachable form userspace with an ioctl call. It will add
+* the give value to the traspose
+*	
+* @arg: the change ot the transposed value
+*
+* Return: the ne transpose value between -127 and 127  
+**/
 long cmidid_transpose(unsigned long arg)
 {
 	dbg("transpose %lu\n", arg);
@@ -30,6 +44,12 @@ static void config_note_event(struct snd_seq_event *event, unsigned char note,
 			      snd_seq_event_type_t type);
 static void dispatch_event(struct snd_seq_event *event);
 
+/*
+* note_on:  send note on to midi device
+*
+* @note: the note to be sended between 0 and 127
+* @velocity: the velocity of this note
+*/
 void note_on(unsigned char note, unsigned char velocity)
 {
 	struct snd_seq_event event;
@@ -40,6 +60,12 @@ void note_on(unsigned char note, unsigned char velocity)
 	dispatch_event(&event);
 }
 
+/*
+* note_off: send note off to midi device. For every note on one
+*           note off should be sended.
+*
+* @note: send note of to
+*/
 void note_off(unsigned char note)
 {
 	struct snd_seq_event event;
@@ -50,6 +76,14 @@ void note_off(unsigned char note)
 	dispatch_event(&event);
 }
 
+/*
+* config_note_event: configure a alsa seq event as note
+*
+* @event: this event will be filled with information
+* @note: th note which sould be set. Forced bounds between 0 and 127
+* @velocity: Velocity of the note. Forxed bounds between 0 and 127
+* @type: note on or note off event
+*/
 static void config_note_event(struct snd_seq_event *event, unsigned char note,
 			      unsigned char velocity, snd_seq_event_type_t type)
 {
@@ -95,6 +129,11 @@ static void dispatch_event(struct snd_seq_event *event)
 	}
 }
 
+/*
+* midi_init: Initialize midi component
+* 
+* Return: zero means success and negative value error
+*/
 int midi_init(void)
 {
 	int err;
@@ -114,6 +153,7 @@ int midi_init(void)
 		return err;
 	}
 
+	/* TODO: free pinfo */
 	pinfo = kzalloc(sizeof(struct snd_seq_port_info), GFP_KERNEL);
 	if (!pinfo) {
 		err = -ENOMEM;
@@ -135,6 +175,9 @@ int midi_init(void)
 	return 0;
 }
 
+/*
+* midi_exit: cleanup midi component
+*/
 void midi_exit(void)
 {
 	snd_seq_delete_kernel_client(client);
