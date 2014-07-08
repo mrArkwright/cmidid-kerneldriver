@@ -165,6 +165,27 @@ The buttons are best attached by a pull-up circuit:
 Be careful! Use the 3.3V pin and not the 5V, otherwise you would break your GPIO.
 
 
+### Example Setup
+
+An example setup could look like this:
+
+![Pull up circuit](/documentation/setup.jpg)
+
+Two raspberry pis were used. The one on the left with 2 keys (4 buttons) and the right one with 4 keys (8 buttons).
+
+These are connected via 100 MBit ethernet. 
+
+To synthesize the audio it is preferable to use more powerful hardware as the MacBook Pro shown with Logic. In direct comparisons of the path
+
+GPIO -> cmidid -> alsa -> fluidsynth
+
+versus
+
+GPIO -> cmidid -> alsa -> applemidi -> network -> Logic
+
+the latter one had less delay. This evolves from the high performance requirements of the synthesizer, which are not reached by the raspberry pi. 
+
+
 
 
 
