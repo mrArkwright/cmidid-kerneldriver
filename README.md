@@ -11,6 +11,12 @@ It's possible to use several Linux machines with CMIDID drivers to send
 MIDI events over the network and combine the events via AppleMIDI into a
 single MIDI output.
 
+###DISCLAIMER
+
+We are not responsible for any damage to your system. Neither software nor hardware.
+
+Use at your own responsibility 
+
 ## Preparing your Raspberry 
 
 In order to build kernel modules on your raspberry pi, running the current version of raspbian, it is necessary to install the kernel sources as they are not shipped in a convenient debian package.
@@ -134,5 +140,32 @@ _This feature is not yet implemented._
 
 As UDP does not acknowledge Packets, there can be undetected loss. The option to use TCP instead was not chosen because of the overall overhead, which leads to delays.
 To compensate for this, the rtpMIDI standard specifies a journal which logs all sent events for every client. The AppleMIDI session management then periodically sends feedback packets to acknowledge the reception of packets up to some sequence number. All earlier journal logs can then be discarded.
+
+
+## Building an Instrument
+
+###Kernel Modules
+
+If you sacrifice a raspberry to your fancy new instrument, you probably do not want to set everything up after each boot.
+It is possible to put a compiled version of the kernel modules in the
+	
+	/lib/modules/`uname -r`/build/
+
+directory so it can be found by `modprobe` and be loaded at boot time. The configuration for this depends on you distribution (most probably `/etc/modules` or `/etc/modprobe.d`).
+
+
+###Hardware
+
+For building an actual hardware instrument it is necessary to dive a tiny little bit into electronics. This is also means, that you can __destroy__ real hardware (raspberry pi) if you screw things up.
+
+The buttons are best attached by a pull-up circuit:
+
+![Pull up circuit](/documentation/circuits/pull-up.svg)
+
+Be careful! Use the 3.3V pin and not the 5V, otherwise you would break your GPIO.
+
+
+
+
 
 

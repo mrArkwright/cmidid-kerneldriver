@@ -1,0 +1,36 @@
+\documentclass[paper=a4,fontsize=11pt,pagesize,bibtotoc]{scrartcl}
+
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+
+\usepackage{textcomp} 
+\usepackage[osf]{mathpazo} 
+\usepackage{helvet}
+\usepackage{microtype}
+\usepackage{booktabs} 
+\usepackage{tikz}
+	\usetikzlibrary{shapes,arrows,patterns,fpu}
+\usepackage{pgfplots}
+\usepackage{amsthm, amssymb, amsmath}
+\usepackage{graphicx}
+\usepackage{subfig}
+\usepackage[tight,nice]{units}
+\usepackage{color}
+
+\usepackage{circuitikz}
+\parindent0pt
+
+
+\pagestyle{empty}
+\begin{document}
+	
+		\begin{circuitikz}
+			
+			\draw (0,0) to[short] (2,0) to[cspst] (2,2) to[short,-*] (1,2); 
+			\node[right] at (2.2,1) {button};
+			\draw (0,0) node[ground] {};
+			\draw (0,-0.5) node[below] {ground};
+			\draw (0,4) node[left]{3.3V} to[short] (1,4) to[resistor=33\,$k\Omega$] (1,2) to[short] (0,2) node[left]{GPIO}; 
+		\end{circuitikz}
+\end{document}
