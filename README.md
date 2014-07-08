@@ -160,7 +160,7 @@ For building an actual hardware instrument it is necessary to dive a tiny little
 
 The buttons are best attached by a pull-up circuit:
 
-![Pull up circuit](/documentation/circuits/pull-up.svg)
+![Pull up circuit](/documentation/circuits/pull-up.png)
 
 Be careful! Use the 3.3V pin and not the 5V, otherwise you would break your GPIO.
 
