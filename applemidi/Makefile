@@ -1,8 +1,13 @@
 obj-m += applertp.o
-applertp-objs := applemidi.o rtp.o rtpmidi.o midi.o clock.o _uldivmod.o alsa.o message.o
-#obj-m += applemidi.o
 
-ccflags-y := -DDEBUG
+#for raspi
+applertp-objs := applemidi.o rtp.o rtpmidi.o midi.o clock.o alsa.o message.o _uldivmod.o
+
+#for systes with __aeabi_uldivmod use this line and comment the one above
+#applertp-objs := applemidi.o rtp.o rtpmidi.o midi.o clock.o alsa.o message.o
+
+#if you need a lot of debug ouput, uncomment the following line
+#ccflags-y := -DDEBUG
 
 SRC := $(shell pwd)
 KSRC:=/lib/modules/$(shell uname -r)/build
