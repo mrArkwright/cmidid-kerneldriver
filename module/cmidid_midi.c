@@ -9,6 +9,13 @@
 
 #include "cmidid_main.h"
 
+/*
+ * The midi channel which is used to send notes.
+ */
+static short midi_channel = 0x00;
+module_param(midi_channel, short, 0);
+MODULE_PARM_DESC(midi_channel, "Which midi channel to use (0 - 15).");
+
 long transposed = 0;
 
 struct snd_card *card;
@@ -102,7 +109,7 @@ static void config_note_event(struct snd_seq_event *event, unsigned char note,
 	event->type = type;
 	event->flags = SNDRV_SEQ_EVENT_LENGTH_FIXED | SNDRV_SEQ_PRIORITY_NORMAL;
 	event->data.note.note = note;
-	event->data.note.channel = 0x00;
+	event->data.note.channel = midi_channel;
 	event->data.note.velocity = velocity;
 	event->data.note.duration = 0xffffff;
 	event->data.note.off_velocity = 0x64;
@@ -138,6 +145,12 @@ int midi_init(void)
 {
 	int err;
 	struct snd_seq_port_info *pinfo;
+
+	if (midi_channel < 0x00 || midi_channel > 0x0F) {
+		err("Midi channel must be between 0 and 15\n");
+		err = -EINVAL;
+		return err;
+	}
 
 	err =
 	    snd_card_create(-1, NULL, THIS_MODULE, sizeof(struct snd_card),
