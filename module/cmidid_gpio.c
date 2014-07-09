@@ -23,6 +23,22 @@ MODULE_PARM_DESC(gpio_mapping,
 		 "Mapping of GPIOs to Keys. Format: gpio1a, gpio1b, note1, gpio2a, ...");
 
 /*
+ * Specifies the polarity (electrical combined with logical in respect
+ * to the key contruction) of the start button of each key.
+ */
+static int start_button_active_high;
+module_param(start_button_active_high, bool, 0);
+MODULE_PARM_DESC(start_button_active_high, "is the start button of each key activated on a rising edge?");
+
+/*
+ * Specifies the polarity (electrical combined with logical in respect
+ * to the key contruction) of the end button of each key.
+ */
+static int end_button_active_high;
+module_param(end_button_active_high, bool, 0);
+MODULE_PARM_DESC(end_button_active_high, "is the end button of each key activated on a rising edge?");
+
+/*
  * The minimum time difference between two subsequent button presses which
  * results in the maximum velocity (127) for the buttton press.
  */
@@ -136,7 +152,7 @@ struct key {
  * @keys: The array of available keys for our keyboard.
  * @num_keys: The total number of available keys.
  *
- * TODO: button_active_high is currently unused. Implement IOCTL.
+ * TODO: button_active_high is currently unused. Implement module params.
  */
 struct cmidid_gpio_state {
 	struct key *keys;
@@ -192,11 +208,11 @@ void set_vel_curve_saturated()
 
 /*
  * handle_button_event: Changes the state of the given key according to the
- * previous stateand the state of the given button.
+ * previous state and the state of the given button.
  *
  * @k: The key which is associated with the current button event.
  * @button: The id of the button. Can be START_BUTTON or END_BUTTON.
- * @active: true if the button was pressed.
+ * @active: true if the button was pressed, false if the button was released.
  */
 static void handle_button_event(struct key *k, unsigned char button,
 				bool active)
@@ -369,16 +385,16 @@ int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 static struct key *get_key_from_timer(struct hrtimer *timer,
 				      unsigned char *index)
 {
-	int i;
+	struct key *k;
 
-	for (i = 0; i < state.num_keys; i++) {
-		if (&state.keys[i].hrtimers[START_BUTTON] == timer) {
+	for (k = state.keys; k < state.keys + state.num_keys; k++) {
+		if (&k.hrtimers[START_BUTTON] == timer) {
 			*index = START_BUTTON;
-			return &state.keys[i];
+			return k;
 		}
-		if (&state.keys[i].hrtimers[END_BUTTON] == timer) {
+		if (&k.hrtimers[END_BUTTON] == timer) {
 			*index = END_BUTTON;
-			return &state.keys[i];
+			return k;
 		}
 	}
 
@@ -401,7 +417,7 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 	int gpio_active;	// gpio_value_start, gpio_value_end;
 	unsigned char button;
 
-	/* The following line removes an annoying warning :) */
+	/* The following line removes an annoying warning :) TODO*/
 	k = NULL;
 	k = get_key_from_timer(timer, &button);
 
@@ -417,7 +433,7 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 
 	dbg("Timer Button GPIO %d detected as %hhd index: %d\n",
 	    k->gpios[button].gpio, gpio_active, button);
-	handle_button_event(k, button, !gpio_active);
+	handle_button_event(k, button, !(state.button_active_high[button] ^ gpio_active));
 
 	return HRTIMER_NORESTART;
 }
@@ -539,6 +555,9 @@ int gpio_init(void)
 	state.stroke_time_max = stroke_time_max;
 
 	state.vel_curve = VEL_CURVE_LINEAR;
+	
+	state.button_active_high[START_BUTTON] = start_button_active_high;
+	state.button_active_high[END_BUTTON] = end_button_active_high;
 
 	/* Initialize the state and key structs. */
 	for (i = 0; i < state.num_keys; i++) {

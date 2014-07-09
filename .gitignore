@@ -9,6 +9,8 @@
 *.orig
 *~
 
+.DS_Store
+
 **/modules.order
 **/Module.symvers
 **/.tmp_versions

@@ -2,6 +2,7 @@
 
 #include <linux/device.h>
 #include <linux/slab.h>
+#include <linux/moduleparam.h>
 
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
@@ -12,8 +13,8 @@
 /*
  * The midi channel which is used to send notes.
  */
-static short midi_channel = 0x00;
-module_param(midi_channel, short, 0);
+static char midi_channel = 0x00;
+module_param(midi_channel, byte, 0);
 MODULE_PARM_DESC(midi_channel, "Which midi channel to use (0 - 15).");
 
 long transposed = 0;
