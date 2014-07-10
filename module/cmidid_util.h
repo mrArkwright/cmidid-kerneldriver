@@ -3,8 +3,6 @@
 
 #include <linux/device.h>
 
-#define DEBUG
-
 /*
  * Logging wrapper functions
  *

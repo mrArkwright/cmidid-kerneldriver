@@ -1,4 +1,3 @@
-#include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
 #include <linux/hardirq.h>	// for in_atomic()
