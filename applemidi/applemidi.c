@@ -1,3 +1,9 @@
+/**
+ * This manager handles the main logic of the applemidi driver.
+ * It handles the reception of network packets an the complete 
+ * session management. 
+ */
+
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/ip.h>
@@ -418,6 +424,14 @@ static int _test_applemidi(u16 *buf, int len)
 	}
 	return 1;
 }
+
+/**
+ * @brief Receive Packets from Socket
+ * This callback is called from the network stack
+ * @private @memberof MIDIDriverAppleMIDI
+ * @param sk The socket.
+ * @param bytes The number of bytes received.
+ */
 
 static void _socket_callback(struct sock *sk, int bytes)
 {
