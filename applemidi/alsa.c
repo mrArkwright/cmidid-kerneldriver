@@ -1,3 +1,8 @@
+/**
+All alsa dependent initialisations and callbacks are handled here.
+They are called by MIDIDriver abstraction layer.
+*/
+
 #include <linux/module.h>
 #include <sound/core.h>
 #include <sound/initval.h>
@@ -14,6 +19,10 @@
 
 #define SND_SEQ_EVENT_NOTEON 6
 #define SND_SEQ_EVENT_NOTEOFF 7
+
+/**
+ * Struct to pass to the alsa callback with all necessary references
+ */
 
 struct privateData
 {
@@ -52,6 +61,8 @@ static int _alsa_input(struct snd_seq_event *ev, int direct, void *private_data,
 	} else {
 		return 1;
 	}
+	
+	//might be changed to ev->data.raw?? for event independant passing
 
 	data->msg.data.bytes[0] |= ev->data.note.channel & 0xf;
 	data->msg.data.bytes[1] = ev->data.note.note;

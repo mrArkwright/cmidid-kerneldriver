@@ -141,6 +141,33 @@ _This feature is not yet implemented._
 As UDP does not acknowledge Packets, there can be undetected loss. The option to use TCP instead was not chosen because of the overall overhead, which leads to delays.
 To compensate for this, the rtpMIDI standard specifies a journal which logs all sent events for every client. The AppleMIDI session management then periodically sends feedback packets to acknowledge the reception of packets up to some sequence number. All earlier journal logs can then be discarded.
 
+### Internals
+
+#### Initialisation
+Up on initialization the following call-trace is taken.
+
+mod_init
+* MIDIDriverAppleMIDICreate
+** allocate main driver structure
+** MIDIDriverInit, initialize alsa connection
+*** ALSARegisterClient, create alsa card and client
+*** MIDIClockProvide, init a clock for timestamping of events
+** \_applemidi\_connect, initialize networking
+*** sock_create, create control socket
+*** sock_create, create rtp socket
+*** sk->sk\_data_ready, set receive callback function
+** RTPSessionCreate, create RTP session
+*** select source id (ssrc)
+** RTPMIDISessionCreate, create  RTPMIDI session
+** setup_timer, start up periodical timer for synchronisation
+
+On unload all allocated structures are freed and peer connections are hung up.
+
+mod_exit
+* MIDIDriverAppleMIDIDestroy
+** \_applemidi_disconnect, hang up clients
+*** \_applemidi\_disconnect_peer, end peer sessions and free data structures
+*** sock_release, release network sockets
 
 ## Building an Instrument
 
