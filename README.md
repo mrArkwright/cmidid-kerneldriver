@@ -144,6 +144,21 @@ To compensate for this, the rtpMIDI standard specifies a journal which logs all 
 
 ## Building an Instrument
 
+###Usage
+
+The kernel module responsible for the hardware access can be build directly in the folder `module` by using make.
+This kernel module needs some parameters as shown in the `module/start_module.sh` script.
+
+	insmod cmidid.ko gpio_mapping=17,4,60 jitter_res_time=10000000 start_button_active_high=0
+
+The `gpio_mapping` parameter is used to map a key to two buttons connected to gpios. As descriped in the presentation, the first button is pressed at the beginning of the key stroke and the second at the end. The third parameter is the pitch of the note the key should have. The number of arguments has to be a multiple of 3 to match this pattern. The maximum number of keys is defined in the `cmidid_main.h`
+
+	#define MAX_KEYS 88
+
+The `jitter_res_time` describes the time after the first rising or falling edge which should be used to determine the acutal value of the button. This value depends on the hardware button which was used.
+
+The `start_button_active_high` should be changed if a pull-down is used instead of a pull-up.
+
 ###Kernel Modules
 
 If you sacrifice a raspberry to your fancy new instrument, you probably do not want to set everything up after each boot.

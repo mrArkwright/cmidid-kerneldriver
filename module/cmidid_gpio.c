@@ -14,7 +14,7 @@
  * The format for passing the values is:
  * gpio_mapping=gpio1a,gpio1b,note1,gpio2a,gpio2b,note2
  */
-static int gpio_mapping[MAX_KEYS];
+static int gpio_mapping[MAX_KEYS * 3];
 static int gpio_mapping_size;
 module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,

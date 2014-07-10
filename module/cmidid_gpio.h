@@ -2,7 +2,7 @@
 #define CMIDID_GPIO_H
 
 /* Maximum number of keys that can be specified in gpio_mapping param. */
-#define MAX_KEYS 90
+#define MAX_KEYS 88
 
 uint32_t set_min_stroke_time(void);
 uint32_t set_max_stroke_time(void);
