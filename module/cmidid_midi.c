@@ -144,7 +144,7 @@ static void dispatch_event(struct snd_seq_event *event)
 int cmidid_midi_init(void)
 {
 	int err;
-	struct snd_seq_port_info *pinfo;
+	struct snd_seq_port_info pinfo;
 
 	if (midi_channel < 0x00 || midi_channel > 0x0F) {
 		err("Midi channel must be between 0 and 15\n");
@@ -168,20 +168,15 @@ int cmidid_midi_init(void)
 		return err;
 	}
 
-	/* TODO: free pinfo */
-	pinfo = kzalloc(sizeof(struct snd_seq_port_info), GFP_KERNEL);
-	if (!pinfo) {
-		err = -ENOMEM;
-		return err;
-	}
-	pinfo->addr.client = state.client;
-	pinfo->capability |=
+	memset(&pinfo, 0, sizeof(struct snd_seq_port_info));
+	pinfo.addr.client = state.client;
+	pinfo.capability |=
 	    SNDRV_SEQ_PORT_CAP_READ | SNDRV_SEQ_PORT_CAP_SYNC_READ |
 	    SNDRV_SEQ_PORT_CAP_SUBS_READ;
 
 	err =
 	    snd_seq_kernel_client_ctl(state.client, SNDRV_SEQ_IOCTL_CREATE_PORT,
-				      pinfo);
+				      &pinfo);
 	if (err < 0) {
 		err("error creating port: %d\n", err);
 		return err;
