@@ -6,7 +6,7 @@
 #include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 
-#include "cmidid_main.h"
+#include "cmidid_util.h"
 #include "cmidid_gpio.h"
 #include "cmidid_midi.h"
 

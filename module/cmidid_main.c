@@ -5,6 +5,7 @@
 #include <linux/device.h>
 
 #include "cmidid_main.h"
+#include "cmidid_util.h"
 #include "cmidid_ioctl.h"
 #include "cmidid_midi.h"
 #include "cmidid_gpio.h"

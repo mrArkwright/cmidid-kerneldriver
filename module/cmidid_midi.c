@@ -3,13 +3,13 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
-
 #include <linux/hardirq.h>	// for in_atomic()
 
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
 
-#include "cmidid_main.h"
+#include "cmidid_midi.h"
+#include "cmidid_util.h"
 
 /*
  * The midi channel which is used for the generated notes.
