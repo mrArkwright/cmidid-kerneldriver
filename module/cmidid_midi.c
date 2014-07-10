@@ -4,7 +4,7 @@
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
 
-#include <linux/hardirq.h> // for in_atomic()
+#include <linux/hardirq.h>	// for in_atomic()
 
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
@@ -12,7 +12,7 @@
 #include "cmidid_main.h"
 
 /*
- * The midi channel which is used to send notes.
+ * The midi channel which is used for the generated notes.
  */
 static char midi_channel = 0x00;
 module_param(midi_channel, byte, 0);
@@ -24,7 +24,7 @@ MODULE_PARM_DESC(midi_channel, "Which midi channel to use (0 - 15).");
  * The state of the MIDI component of our kernel module.
  * @card: The sound card registered to the system.
  * @client: The client number used in the alsa sequencer system.
- * @midi_channel: the midi_channel used to send notes
+ * @midi_channel: the midi_channel used for the generated notes
  * @transpose: the transpose value in semitones added to the tone pitch.
  */
 struct cmidid_midi_state {
@@ -47,11 +47,11 @@ static void config_note_event(struct snd_seq_event *event, unsigned char note,
 static void dispatch_event(struct snd_seq_event *event);
 
 /*
- * cmidid_transpose: add a value to the current transpose
+ * cmidid_transpose: Add a value to the current transpose.
  *
- * @transpose: the value added to the current transpose
+ * @transpose: the value in semitones added to the current transpose
  *
- * return: the new absolute transpose value (between -128 and 127)
+ * return: the new absolute transpose value in semitones (between -128 and 127)
  */
 signed char cmidid_transpose(signed char transpose)
 {
@@ -64,7 +64,7 @@ signed char cmidid_transpose(signed char transpose)
 }
 
 /*
-* note_on: trigger a note_on event
+* cmidid_note_on: Trigger a note_on event.
 *
 * @note: the pitch of the note (between 0 and 127)
 * @velocity: the velocity of the note
@@ -80,7 +80,7 @@ void cmidid_note_on(unsigned char note, unsigned char velocity)
 }
 
 /*
- * note_off: trigger a note_off event. For every note_on a
+ * cmidid_note_off: Trigger a note_off event. For every note_on a
  * note_off should be triggered.
  *
  * @note: the pitch of the note to turn off
@@ -96,8 +96,8 @@ void cmidid_note_off(unsigned char note)
 }
 
 /*
- * config_note_event: configure a alsa seq event as note
- * the 
+ * config_note_event: Configure a alsa sequencer event as note.
+ * The 
  *
  * @event: a pointer to the event which will be configured
  * @note: the note which sould be set. Forced bounds between 0 and 127
@@ -107,10 +107,14 @@ void cmidid_note_off(unsigned char note)
 static void config_note_event(struct snd_seq_event *event, unsigned char note,
 			      unsigned char velocity, snd_seq_event_type_t type)
 {
+	//take transpose into account
 	note += state.transpose;
 
+	//cap the pitch of the note at 127
 	if (note >= 127)
 		note = 127;
+
+	//cap the velocity of the note at 127
 	if (velocity >= 127)
 		velocity = 127;
 
@@ -150,7 +154,7 @@ static void dispatch_event(struct snd_seq_event *event)
 }
 
 /*
- * midi_init: Initialize midi component
+ * cmidid_midi_init: Initialize MIDI component.
  * 
  * return: zero on success and negative error code
  * on error
@@ -160,14 +164,16 @@ int cmidid_midi_init(void)
 	int err;
 	struct snd_seq_port_info pinfo;
 
+	//check if the midi_channel set module param is in valid range (0 - 15)
 	if (midi_channel < 0x00 || midi_channel > 0x0F) {
 		err("Midi channel must be between 0 and 15\n");
 		err = -EINVAL;
 		return err;
 	}
-
+	//copy midi_channel to state struct
 	state.midi_channel = midi_channel;
 
+	// register sound card at the alsa system
 	err =
 	    snd_card_create(-1, NULL, THIS_MODULE, sizeof(struct snd_card),
 			    &state.card);
@@ -175,13 +181,13 @@ int cmidid_midi_init(void)
 		err("error creating card: %d\n", err);
 		return err;
 	}
-
+	// add sequencer client to our sound card
 	state.client = snd_seq_create_kernel_client(state.card, 0, "cmidid");
 	if (state.client < 0) {
 		err("error creating client: %d\n", err);
 		return err;
 	}
-
+	// configure our sequencer client to have one readable (output) port
 	memset(&pinfo, 0, sizeof(struct snd_seq_port_info));
 	pinfo.addr.client = state.client;
 	pinfo.capability |=
@@ -200,10 +206,13 @@ int cmidid_midi_init(void)
 }
 
 /*
- * midi_exit: cleanup midi component
+ * cmidid_midi_exit: Cleanup MIDI component.
  */
 void cmidid_midi_exit(void)
 {
+	// free our sequencer client
 	snd_seq_delete_kernel_client(state.client);
+
+	// free our sound card
 	snd_card_free(state.card);
 }
