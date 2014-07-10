@@ -1,12 +1,10 @@
-#define DEBUG
-
 #include <linux/gpio.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/interrupt.h>
 #include <linux/moduleparam.h>
 
-#include "cmidid_main.h"
+#include "cmidid_util.h"
 #include "cmidid_gpio.h"
 #include "cmidid_midi.h"
 
@@ -16,7 +14,7 @@
  * The format for passing the values is:
  * gpio_mapping=gpio1a,gpio1b,note1,gpio2a,gpio2b,note2
  */
-static int gpio_mapping[MAX_REQUEST];
+static int gpio_mapping[MAX_KEYS * 3];
 static int gpio_mapping_size;
 module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
@@ -26,17 +24,19 @@ MODULE_PARM_DESC(gpio_mapping,
  * Specifies the polarity (electrical combined with logical in respect
  * to the key contruction) of the start button of each key.
  */
-static int start_button_active_high;
+static bool start_button_active_high;
 module_param(start_button_active_high, bool, 0);
-MODULE_PARM_DESC(start_button_active_high, "is the start button of each key activated on a rising edge?");
+MODULE_PARM_DESC(start_button_active_high,
+		 "is the start button of each key activated on a rising edge?");
 
 /*
  * Specifies the polarity (electrical combined with logical in respect
  * to the key contruction) of the end button of each key.
  */
-static int end_button_active_high;
+static bool end_button_active_high;
 module_param(end_button_active_high, bool, 0);
-MODULE_PARM_DESC(end_button_active_high, "is the end button of each key activated on a rising edge?");
+MODULE_PARM_DESC(end_button_active_high,
+		 "is the end button of each key activated on a rising edge?");
 
 /*
  * The minimum time difference between two subsequent button presses which
@@ -230,14 +230,14 @@ static void handle_button_event(struct key *k, unsigned char button,
 			k->state = KEY_TOUCHED;
 		} else if ((button == START_BUTTON) && !active) {
 			/* First buttons was release -> key was released. */
-			note_off(k->note);
+			cmidid_note_off(k->note);
 		}
 		break;
 	case KEY_TOUCHED:
 		/* Only the first button of the key was pressed previously. */
 		if ((button == START_BUTTON) && !active) {
 			/* The first button is released -> not pressed. */
-			note_off(k->note);
+			cmidid_note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
 			/* The second button is hit -> pressed completely. */
@@ -248,7 +248,7 @@ static void handle_button_event(struct key *k, unsigned char button,
 			state.last_stroke_time = timediff;
 
 			velocity = time_to_velocity(timediff);
-			note_on(k->note, velocity);
+			cmidid_note_on(k->note, velocity);
 
 			k->last_velocity = velocity;
 			k->state = KEY_PRESSED;
@@ -260,16 +260,16 @@ static void handle_button_event(struct key *k, unsigned char button,
 			/* The first button was released -> not pressed.
 			 * Note: This shouldn't happen (?) for a real key.
 			 */
-			note_off(k->note);
+			cmidid_note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
 			/* The second button was hit again. */
-			note_off(k->note);
-			note_on(k->note, k->last_velocity);
+			cmidid_note_off(k->note);
+			cmidid_note_on(k->note, k->last_velocity);
 		}
 		break;
 	default:
-		note_off(k->note);
+		cmidid_note_off(k->note);
 		k->state = KEY_INACTIVE;
 	}
 
@@ -388,11 +388,11 @@ static struct key *get_key_from_timer(struct hrtimer *timer,
 	struct key *k;
 
 	for (k = state.keys; k < state.keys + state.num_keys; k++) {
-		if (&k.hrtimers[START_BUTTON] == timer) {
+		if (&k->hrtimers[START_BUTTON] == timer) {
 			*index = START_BUTTON;
 			return k;
 		}
-		if (&k.hrtimers[END_BUTTON] == timer) {
+		if (&k->hrtimers[END_BUTTON] == timer) {
 			*index = END_BUTTON;
 			return k;
 		}
@@ -417,7 +417,7 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 	int gpio_active;	// gpio_value_start, gpio_value_end;
 	unsigned char button;
 
-	/* The following line removes an annoying warning :) TODO*/
+	/* The following line removes an annoying warning :) TODO */
 	k = NULL;
 	k = get_key_from_timer(timer, &button);
 
@@ -433,7 +433,8 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 
 	dbg("Timer Button GPIO %d detected as %hhd index: %d\n",
 	    k->gpios[button].gpio, gpio_active, button);
-	handle_button_event(k, button, !(state.button_active_high[button] ^ gpio_active));
+	handle_button_event(k, button,
+			    !(state.button_active_high[button] ^ gpio_active));
 
 	return HRTIMER_NORESTART;
 }
@@ -555,7 +556,7 @@ int gpio_init(void)
 	state.stroke_time_max = stroke_time_max;
 
 	state.vel_curve = VEL_CURVE_LINEAR;
-	
+
 	state.button_active_high[START_BUTTON] = start_button_active_high;
 	state.button_active_high[END_BUTTON] = end_button_active_high;
 

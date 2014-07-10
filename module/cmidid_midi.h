@@ -1,14 +1,12 @@
 #ifndef CMIDID_MIDI_H
 #define CMIDID_MIDI_H
 
-int midi_init(void);
+signed char cmidid_transpose(signed char transpose);
 
-void note_on(unsigned char note, unsigned char velocity);
+void cmidid_note_on(unsigned char note, unsigned char velocity);
+void cmidid_note_off(unsigned char note);
 
-void note_off(unsigned char note);
-
-void midi_exit(void);
-
-long cmidid_transpose(unsigned long arg);
+int cmidid_midi_init(void);
+void cmidid_midi_exit(void);
 
 #endif
