@@ -152,10 +152,10 @@ mod_init
     * `MIDIDriverInit`, initialize alsa connection
         * `ALSARegisterClient`, create alsa card and client
         * `MIDIClockProvide`, init a clock for timestamping of events
-    * `\_applemidi\_connect`, initialize networking
+    * `_applemidi_connect`, initialize networking
         * `sock_create`, create control socket
         * `sock_create`, create rtp socket
-        * `sk->sk\_data_ready`, set receive callback function
+        * `sk->sk_data_ready`, set receive callback function
     * `RTPSessionCreate`, create RTP session
         * select source id (`ssrc`)
     * `RTPMIDISessionCreate`, create  RTPMIDI session
@@ -166,8 +166,8 @@ On unload all allocated structures are freed and peer connections are hung up.
 
 mod_exit
 * `MIDIDriverAppleMIDIDestroy`
-    * `\_applemidi_disconnect`, hang up clients
-        * `\_applemidi\_disconnect_peer`, end peer sessions and free data structures
+    * `_applemidi_disconnect`, hang up clients
+        * `_applemidi_disconnect_peer`, end peer sessions and free data structures
         * `sock_release`, release network sockets
 	* free sessions
 	* `del_timer`
@@ -197,6 +197,18 @@ Invitations are all accepted and session termination packets are processed with 
 For synchronization packets the timestamps are calculated and responded (`_applemidi_sync`).
 
 All outgoing commands are handled by `_applemidi_send_command` which assembles binary packets from `command` structures and sends them over the specified socket.
+
+##### Alsa event
+
+Alsa events from connected producers are catched by the `_alsa_input` callback. This repackages a `snd_seq_event` to a `MIDIMessage` object and passes this to `RTPMIDISessionSend`.
+
+This creates the appropriate RTPMIDI packet for each peer:
+* per peer journal
+* differential timestamps
+
+The content is then passed to `RTPSessionSendPacket` for encapsulation in a RTP packet.
+
+There information as the ssrc and the rtp payload type is prepended and finally sent from the rtp socket.
 
 
 ##cmidid Kernel Module
