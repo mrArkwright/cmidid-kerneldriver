@@ -1,12 +1,17 @@
 #ifndef CMIDID_UTIL_H
 #define CMIDID_UTIL_H
 
-/**********************************************************************
+#include <linux/device.h>
+
+#define DEBUG
+
+/*
  * Logging wrapper functions
  *
- * The `err' macro is really useful, because it prints the filename,
- * line number and function name alongside the error message.
- **********************************************************************/
+ * These macros print additional information like the
+ * filename, line number and function name alongside
+ * the message.
+ */
 extern struct device *cmidid_device;
 
 #define info(fmt, ...) \
