@@ -4,7 +4,7 @@
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
 
-#include <linux/hardirq.h>	// for in_atomic()
+#include <linux/hardirq.h> // for in_atomic()
 
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
@@ -18,6 +18,15 @@ static char midi_channel = 0x00;
 module_param(midi_channel, byte, 0);
 MODULE_PARM_DESC(midi_channel, "Which midi channel to use (0 - 15).");
 
+/*
+ * cmidid_midi_state:
+ *
+ * The state of the MIDI component of our kernel module.
+ * @card: The sound card registered to the system.
+ * @client: The client number used in the alsa sequencer system.
+ * @midi_channel: the midi_channel used to send notes
+ * @transpose: the transpose value in semitones added to the tone pitch.
+ */
 struct cmidid_midi_state {
 	struct snd_card *card;
 	int client;
@@ -37,16 +46,13 @@ static void config_note_event(struct snd_seq_event *event, unsigned char note,
 			      snd_seq_event_type_t type);
 static void dispatch_event(struct snd_seq_event *event);
 
-/**
-* cmidid_transpose: 
-* 
-* Reachable form userspace with an ioctl call. It will add
-* the give value to the traspose
-*	
-* @arg: the change ot the transposed value
-*
-* Return: the new absolute transpose value between -128 and 127 
-**/
+/*
+ * cmidid_transpose: add a value to the current transpose
+ *
+ * @transpose: the value added to the current transpose
+ *
+ * return: the new absolute transpose value (between -128 and 127)
+ */
 signed char cmidid_transpose(signed char transpose)
 {
 	state.transpose += transpose;
@@ -58,10 +64,10 @@ signed char cmidid_transpose(signed char transpose)
 }
 
 /*
-* note_on:  send note on to midi device
+* note_on: trigger a note_on event
 *
-* @note: the note to be sended between 0 and 127
-* @velocity: the velocity of this note
+* @note: the pitch of the note (between 0 and 127)
+* @velocity: the velocity of the note
 */
 void cmidid_note_on(unsigned char note, unsigned char velocity)
 {
@@ -74,11 +80,11 @@ void cmidid_note_on(unsigned char note, unsigned char velocity)
 }
 
 /*
-* note_off: send note off to midi device. For every note on one
-*           note off should be sended.
-*
-* @note: send note of to
-*/
+ * note_off: trigger a note_off event. For every note_on a
+ * note_off should be triggered.
+ *
+ * @note: the pitch of the note to turn off
+ */
 void cmidid_note_off(unsigned char note)
 {
 	struct snd_seq_event event;
@@ -90,13 +96,14 @@ void cmidid_note_off(unsigned char note)
 }
 
 /*
-* config_note_event: configure a alsa seq event as note
-*
-* @event: this event will be filled with information
-* @note: th note which sould be set. Forced bounds between 0 and 127
-* @velocity: Velocity of the note. Forced bounds between 0 and 127
-* @type: note on or note off event
-*/
+ * config_note_event: configure a alsa seq event as note
+ * the 
+ *
+ * @event: a pointer to the event which will be configured
+ * @note: the note which sould be set. Forced bounds between 0 and 127
+ * @velocity: Velocity of the note. Forced bounds between 0 and 127
+ * @type: note on or note off event
+ */
 static void config_note_event(struct snd_seq_event *event, unsigned char note,
 			      unsigned char velocity, snd_seq_event_type_t type)
 {
@@ -113,7 +120,7 @@ static void config_note_event(struct snd_seq_event *event, unsigned char note,
 	event->data.note.channel = state.midi_channel;
 	event->data.note.velocity = velocity;
 	event->data.note.duration = 0xffffff;
-	event->data.note.off_velocity = 0x64;
+	event->data.note.off_velocity = velocity;
 	event->queue = SNDRV_SEQ_QUEUE_DIRECT;
 	event->dest.client = SNDRV_SEQ_ADDRESS_SUBSCRIBERS;
 	event->dest.port = 0;	/* FIXME: Which ports to use ? */
@@ -121,6 +128,12 @@ static void config_note_event(struct snd_seq_event *event, unsigned char note,
 	event->source.port = 0;
 }
 
+/*
+ * dispatch_event: dispatch an alsa event to the alsa
+ * sequencer client registered by this module
+ *
+ * @event: the event to dispatch
+ */
 static void dispatch_event(struct snd_seq_event *event)
 {
 	int err;
@@ -137,10 +150,11 @@ static void dispatch_event(struct snd_seq_event *event)
 }
 
 /*
-* midi_init: Initialize midi component
-* 
-* Return: zero means success and negative value error
-*/
+ * midi_init: Initialize midi component
+ * 
+ * return: zero on success and negative error code
+ * on error
+ */
 int cmidid_midi_init(void)
 {
 	int err;
@@ -186,8 +200,8 @@ int cmidid_midi_init(void)
 }
 
 /*
-* midi_exit: cleanup midi component
-*/
+ * midi_exit: cleanup midi component
+ */
 void cmidid_midi_exit(void)
 {
 	snd_seq_delete_kernel_client(state.client);
