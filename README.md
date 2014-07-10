@@ -148,26 +148,26 @@ Up on initialization the following call-trace is taken.
 
 mod_init
 * MIDIDriverAppleMIDICreate
-** allocate main driver structure
-** MIDIDriverInit, initialize alsa connection
-*** ALSARegisterClient, create alsa card and client
-*** MIDIClockProvide, init a clock for timestamping of events
-** \_applemidi\_connect, initialize networking
-*** sock_create, create control socket
-*** sock_create, create rtp socket
-*** sk->sk\_data_ready, set receive callback function
-** RTPSessionCreate, create RTP session
-*** select source id (ssrc)
-** RTPMIDISessionCreate, create  RTPMIDI session
-** setup_timer, start up periodical timer for synchronisation
+    * allocate main driver structure
+    * MIDIDriverInit, initialize alsa connection
+        * ALSARegisterClient, create alsa card and client
+        * MIDIClockProvide, init a clock for timestamping of events
+    * \_applemidi\_connect, initialize networking
+        * sock_create, create control socket
+        * sock_create, create rtp socket
+        * sk->sk\_data_ready, set receive callback function
+    * RTPSessionCreate, create RTP session
+        * select source id (ssrc)
+    * RTPMIDISessionCreate, create  RTPMIDI session
+    * setup_timer, start up periodical timer for synchronisation
 
 On unload all allocated structures are freed and peer connections are hung up.
 
 mod_exit
 * MIDIDriverAppleMIDIDestroy
-** \_applemidi_disconnect, hang up clients
-*** \_applemidi\_disconnect_peer, end peer sessions and free data structures
-*** sock_release, release network sockets
+    * \_applemidi_disconnect, hang up clients
+        * \_applemidi\_disconnect_peer, end peer sessions and free data structures
+        * sock_release, release network sockets
 
 ##cmidid Kernel Module
 
