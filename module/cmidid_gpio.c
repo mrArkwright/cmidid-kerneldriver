@@ -26,17 +26,19 @@ MODULE_PARM_DESC(gpio_mapping,
  * Specifies the polarity (electrical combined with logical in respect
  * to the key contruction) of the start button of each key.
  */
-static int start_button_active_high;
+static bool start_button_active_high;
 module_param(start_button_active_high, bool, 0);
-MODULE_PARM_DESC(start_button_active_high, "is the start button of each key activated on a rising edge?");
+MODULE_PARM_DESC(start_button_active_high,
+		 "is the start button of each key activated on a rising edge?");
 
 /*
  * Specifies the polarity (electrical combined with logical in respect
  * to the key contruction) of the end button of each key.
  */
-static int end_button_active_high;
+static bool end_button_active_high;
 module_param(end_button_active_high, bool, 0);
-MODULE_PARM_DESC(end_button_active_high, "is the end button of each key activated on a rising edge?");
+MODULE_PARM_DESC(end_button_active_high,
+		 "is the end button of each key activated on a rising edge?");
 
 /*
  * The minimum time difference between two subsequent button presses which
@@ -388,11 +390,11 @@ static struct key *get_key_from_timer(struct hrtimer *timer,
 	struct key *k;
 
 	for (k = state.keys; k < state.keys + state.num_keys; k++) {
-		if (&k.hrtimers[START_BUTTON] == timer) {
+		if (&k->hrtimers[START_BUTTON] == timer) {
 			*index = START_BUTTON;
 			return k;
 		}
-		if (&k.hrtimers[END_BUTTON] == timer) {
+		if (&k->hrtimers[END_BUTTON] == timer) {
 			*index = END_BUTTON;
 			return k;
 		}
@@ -417,7 +419,7 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 	int gpio_active;	// gpio_value_start, gpio_value_end;
 	unsigned char button;
 
-	/* The following line removes an annoying warning :) TODO*/
+	/* The following line removes an annoying warning :) TODO */
 	k = NULL;
 	k = get_key_from_timer(timer, &button);
 
@@ -433,7 +435,8 @@ enum hrtimer_restart timer_irq(struct hrtimer *timer)
 
 	dbg("Timer Button GPIO %d detected as %hhd index: %d\n",
 	    k->gpios[button].gpio, gpio_active, button);
-	handle_button_event(k, button, !(state.button_active_high[button] ^ gpio_active));
+	handle_button_event(k, button,
+			    !(state.button_active_high[button] ^ gpio_active));
 
 	return HRTIMER_NORESTART;
 }
@@ -555,7 +558,7 @@ int gpio_init(void)
 	state.stroke_time_max = stroke_time_max;
 
 	state.vel_curve = VEL_CURVE_LINEAR;
-	
+
 	state.button_active_high[START_BUTTON] = start_button_active_high;
 	state.button_active_high[END_BUTTON] = end_button_active_high;
 
