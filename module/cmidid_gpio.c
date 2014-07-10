@@ -232,14 +232,14 @@ static void handle_button_event(struct key *k, unsigned char button,
 			k->state = KEY_TOUCHED;
 		} else if ((button == START_BUTTON) && !active) {
 			/* First buttons was release -> key was released. */
-			note_off(k->note);
+			cmidid_note_off(k->note);
 		}
 		break;
 	case KEY_TOUCHED:
 		/* Only the first button of the key was pressed previously. */
 		if ((button == START_BUTTON) && !active) {
 			/* The first button is released -> not pressed. */
-			note_off(k->note);
+			cmidid_note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
 			/* The second button is hit -> pressed completely. */
@@ -250,7 +250,7 @@ static void handle_button_event(struct key *k, unsigned char button,
 			state.last_stroke_time = timediff;
 
 			velocity = time_to_velocity(timediff);
-			note_on(k->note, velocity);
+			cmidid_note_on(k->note, velocity);
 
 			k->last_velocity = velocity;
 			k->state = KEY_PRESSED;
@@ -262,16 +262,16 @@ static void handle_button_event(struct key *k, unsigned char button,
 			/* The first button was released -> not pressed.
 			 * Note: This shouldn't happen (?) for a real key.
 			 */
-			note_off(k->note);
+			cmidid_note_off(k->note);
 			k->state = KEY_INACTIVE;
 		} else if ((button == END_BUTTON) && active) {
 			/* The second button was hit again. */
-			note_off(k->note);
-			note_on(k->note, k->last_velocity);
+			cmidid_note_off(k->note);
+			cmidid_note_on(k->note, k->last_velocity);
 		}
 		break;
 	default:
-		note_off(k->note);
+		cmidid_note_off(k->note);
 		k->state = KEY_INACTIVE;
 	}
 

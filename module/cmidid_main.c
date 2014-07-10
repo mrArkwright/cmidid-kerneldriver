@@ -1,5 +1,3 @@
-#define DEBUG
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
@@ -13,8 +11,7 @@
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Custom Midi-Device Driver");
-MODULE_AUTHOR
-    ("Do you want to have your real names in the git history? -> yes! people should know that we're awesome.");
+MODULE_AUTHOR("Felix Engelmann, Michael Opitz, Andreas Ruhland, Jannik Theiß");
 
 static int __init cmidid_init(void);
 static void __exit cmidid_exit(void);
@@ -69,7 +66,7 @@ static int __init cmidid_init(void)
 	cmidid_device =
 	    device_create(cmidid_class, NULL, cmidid_dev_number, NULL, "%s",
 			  IOCTL_DEV_NAME);
-	if ((err = midi_init()) < 0) {
+	if ((err = cmidid_midi_init()) < 0) {
 		err("%d. Could not initialize MIDI component.\n", err);
 		goto err_midi_init;
 	}
@@ -83,7 +80,7 @@ static int __init cmidid_init(void)
 
 /* Call exit/cleanup routines in reverse order. */
  err_gpio_init:
-	midi_exit();
+	cmidid_midi_exit();
 
  err_midi_init:
 	device_destroy(cmidid_class, cmidid_dev_number);
@@ -110,7 +107,7 @@ static void __exit cmidid_exit(void)
 	dbg("Module exiting...\n");
 
 	gpio_exit();
-	midi_exit();
+	cmidid_midi_exit();
 
 	dbg("Unregistering char device\n");
 	/* Delete Sysfs entry and device file  */
@@ -152,7 +149,7 @@ static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 		set_vel_curve_saturated();
 		break;
 	case CMIDID_TRANSPOSE:
-		return cmidid_transpose(arg);
+		return cmidid_transpose((signed char)arg) + 128;
 		break;
 	default:
 		dbg("unknown ioctl command\n");

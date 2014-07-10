@@ -60,10 +60,10 @@ int main(int argc, char *argv[])
 			printf("Velocity curve set to saturated!\n");
 			break;
 		case 7:
-			printf("Current transpose is %ld add:",
+			printf("Current transpose is %ld add: ",
 			       ioctl(fd, CMIDID_TRANSPOSE, 0) - 128);
 			err = scanf("%d", &value);
-			printf("\nTranspose set to:%ld\n",
+			printf("Transpose set to: %ld\n",
 			       ioctl(fd, CMIDID_TRANSPOSE, value) - 128);
 			break;
 		default:
