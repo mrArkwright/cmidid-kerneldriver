@@ -4,9 +4,10 @@
 #include <linux/slab.h>
 #include <linux/moduleparam.h>
 
+#include <linux/hardirq.h>	// for in_atomic()
+
 #include <sound/core.h>
 #include <sound/seq_kernel.h>
-#include <sound/seq_virmidi.h>	/* TODO: Find real header for in_atomic. */
 
 #include "cmidid_main.h"
 
