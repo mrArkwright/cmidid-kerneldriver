@@ -177,36 +177,60 @@ static enum hrtimer_restart timer_irq(struct hrtimer *timer);
 static irqreturn_t irq_handler(int irq, void *dev_id);
 static bool is_valid(int gpio);
 
+/*
+ * cmidid_set_min_stroke_time: Use the last stroke time as new min_stroke_time.
+ * Used for calibration.
+ *
+ * return: the new min_stroke_time value in 10^2 nanoseconds
+ */
 uint32_t cmidid_set_min_stroke_time()
 {
 	dbg("min stroke time set to %d\n", state.last_stroke_time);
 	return state.stroke_time_max = state.last_stroke_time;
 }
 
+/*
+ * cmidid_set_max_stroke_time: Use the last stroke time as new max_stroke_time.
+ * Used for calibration.
+ *
+ * return: the new max_stroke_time value in 10^2 nanoseconds
+ */
 uint32_t cmidid_set_max_stroke_time()
 {
 	dbg("max stroke time set to %d\n", state.last_stroke_time);
 	return state.stroke_time_max = state.last_stroke_time;
 }
 
+/*
+ * cmidid_set_vel_curve_linear: Set the velocity curve to linear
+ */
 void cmidid_set_vel_curve_linear()
 {
 	dbg("velocity curve set to linear\n");
 	state.vel_curve = VEL_CURVE_LINEAR;
 }
 
+/*
+ * cmidid_set_vel_curve_concave: Set the velocity curve to concave
+ */
 void cmidid_set_vel_curve_concave()
 {
 	dbg("velocity curve set to concave\n");
 	state.vel_curve = VEL_CURVE_CONCAVE;
 }
 
+/*
+ * cmidid_set_vel_curve_convex: Set the velocity curve to convex
+ */
 void cmidid_set_vel_curve_convex()
 {
 	dbg("velocity curve set to convex\n");
 	state.vel_curve = VEL_CURVE_CONVEX;
 }
 
+/*
+ * cmidid_set_vel_curve_saturated: Set the velocity curve to saturated
+ */
 void cmidid_set_vel_curve_saturated()
 {
 	dbg("velocity curve set to saturated\n");
