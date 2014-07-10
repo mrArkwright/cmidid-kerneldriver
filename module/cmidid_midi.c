@@ -183,6 +183,7 @@ int cmidid_midi_init(void)
 	state.client = snd_seq_create_kernel_client(state.card, 0, "cmidid");
 	if (state.client < 0) {
 		err("error creating client: %d\n", err);
+		snd_card_free(state.card);
 		return err;
 	}
 	// configure our sequencer client to have one readable (output) port
@@ -197,6 +198,7 @@ int cmidid_midi_init(void)
 				      &pinfo);
 	if (err < 0) {
 		err("error creating port: %d\n", err);
+		snd_card_free(state.card);
 		return err;
 	}
 
