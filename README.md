@@ -147,27 +147,57 @@ To compensate for this, the rtpMIDI standard specifies a journal which logs all 
 Up on initialization the following call-trace is taken.
 
 mod_init
-* MIDIDriverAppleMIDICreate
+* `MIDIDriverAppleMIDICreate`
     * allocate main driver structure
-    * MIDIDriverInit, initialize alsa connection
-        * ALSARegisterClient, create alsa card and client
-        * MIDIClockProvide, init a clock for timestamping of events
-    * \_applemidi\_connect, initialize networking
-        * sock_create, create control socket
-        * sock_create, create rtp socket
-        * sk->sk\_data_ready, set receive callback function
-    * RTPSessionCreate, create RTP session
-        * select source id (ssrc)
-    * RTPMIDISessionCreate, create  RTPMIDI session
-    * setup_timer, start up periodical timer for synchronisation
+    * `MIDIDriverInit`, initialize alsa connection
+        * `ALSARegisterClient`, create alsa card and client
+        * `MIDIClockProvide`, init a clock for timestamping of events
+    * `\_applemidi\_connect`, initialize networking
+        * `sock_create`, create control socket
+        * `sock_create`, create rtp socket
+        * `sk->sk\_data_ready`, set receive callback function
+    * `RTPSessionCreate`, create RTP session
+        * select source id (`ssrc`)
+    * `RTPMIDISessionCreate`, create  RTPMIDI session
+    * `setup_timer`, start up periodical timer for synchronisation
 
+#### Removal
 On unload all allocated structures are freed and peer connections are hung up.
 
 mod_exit
-* MIDIDriverAppleMIDIDestroy
-    * \_applemidi_disconnect, hang up clients
-        * \_applemidi\_disconnect_peer, end peer sessions and free data structures
-        * sock_release, release network sockets
+* `MIDIDriverAppleMIDIDestroy`
+    * `\_applemidi_disconnect`, hang up clients
+        * `\_applemidi\_disconnect_peer`, end peer sessions and free data structures
+        * `sock_release`, release network sockets
+	* free sessions
+	* `del_timer`
+	* free driver structure
+	
+#### Callbacks
+
+When fully loaded, the module reacts on three types of callbacks.
+
+##### Timer timeout
+
+The timer callback `_applemidi_idle_timeout` is called every 5 seconds and cycles through all peers. With each it initiates a synchronization handshake.
+
+##### Network receive
+
+When a UDP packet is received on one of the listening sockets, `_socket_callback` is called to handle the packet.
+
+If first checks, if it is a valid AppleMIDI packet (`_test_applemidi`) and then tries to process the command (`_applemidi_recv_command`).
+There it dissects the packet byte-wise and fills the `command` structure of the driver.
+
+_As only receiving session invitations is implemented, session initiation is ignored._
+
+After successful parsing the driver composes the according resonse (`_applemidi_respond`).
+
+Invitations are all accepted and session termination packets are processed with deleting the peer.
+
+For synchronization packets the timestamps are calculated and responded (`_applemidi_sync`).
+
+All outgoing commands are handled by `_applemidi_send_command` which assembles binary packets from `command` structures and sends them over the specified socket.
+
 
 ##cmidid Kernel Module
 
