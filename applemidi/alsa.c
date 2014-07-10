@@ -105,7 +105,7 @@ static int _create_port(int my_client, int idx, int type, void *drv)
 }
 
 /*
- * register client and create ports
+ * register client and create port
  */
 struct ALSADriver *ALSARegisterClient(void *drv)
 {
