@@ -9,12 +9,11 @@
 #include "cmidid_midi.h"
 
 /*
- * GPIOs requested via kernel parameter.
- * This is a simple list of gpio ids with an corresponding pitch.
+ * Mapping of GPIO-Pins to keys with corresponding pitch.
  * The format for passing the values is:
- * gpio_mapping=gpio1a,gpio1b,note1,gpio2a,gpio2b,note2
+ * gpio_mapping=gpio1a,gpio1b,note1,gpio2a,gpio2b,note2,...
  */
-static int gpio_mapping[MAX_KEYS];
+static int gpio_mapping[MAX_KEYS * 3];
 static int gpio_mapping_size;
 module_param_array(gpio_mapping, int, &gpio_mapping_size, 0);
 MODULE_PARM_DESC(gpio_mapping,
@@ -39,17 +38,18 @@ MODULE_PARM_DESC(end_button_active_high,
 		 "is the end button of each key activated on a rising edge?");
 
 /*
- * The minimum time difference between two subsequent button presses which
- * results in the maximum velocity (127) for the buttton press.
+ * The minimum time difference between the activation of the start and
+ * end button of a key used to compute the velocity.
+ * This and lower times will result in the maximal velocity.
  */
 static uint32_t stroke_time_min = 1000;
 module_param(stroke_time_min, uint, 0);
 MODULE_PARM_DESC(stroke_time_min, "stroke time for maximal velocity");
 
 /*
- * The time differnence between two button hits for a single key which
- * which results in the minimum (0) velocity for the sent MIDI note.
- * Press times above this value will return the minium velocity, too.
+ * The maximum time difference between the activation of the start and
+ * end button of a key used to compute the velocity.
+ * This and higher times will result in the minimal velocity.
  */
 static uint32_t stroke_time_max = 1000000;
 module_param(stroke_time_max, uint, 0);
@@ -72,8 +72,8 @@ MODULE_PARM_DESC(jitter_res_time,
 /*
  * START_BUTTON and END_BUTTON are used to index the GPIO buttons
  * in every key struct. START_BUTTON is the id for the button
- * which is hit first when the keyboard key is pressed down.
- * When the END_BUTTON is hit, the key should be completely pressed down.
+ * which is hit first when the keyboard key starts to move.
+ * The END_BUTTON is hit, when the key is completely pressed down.
  * Somwhat like this:
  *
  *   |  |
@@ -95,7 +95,7 @@ MODULE_PARM_DESC(jitter_res_time,
  * These values are used in `handle_button_event'.
  *
  * @KEY_INACTIVE: The key is not touched or pressed.
- * @KEY_TOUCHED: The first button of the key is hit/pressed down.
+ * @KEY_TOUCHED: The first button of the key is activated. The key started to move.
  * @KEY_PRESSED: The second button is hit, so the key is completely pressed.
  */
 typedef enum {
@@ -106,7 +106,7 @@ typedef enum {
 
 /*
  * VEL_CURVE: The types of interpolation curves used to calculate the
- * velocity for every noteon MIDI event.
+ * velocity for MIDI note_on events.
  */
 typedef enum {
 	VEL_CURVE_LINEAR,
@@ -118,17 +118,16 @@ typedef enum {
 /*
  * struct key:
  *
- * This struct represents a single key for an abstract MIDI keyboard.
- * Each of those keys is associated with two buttons/triggers which are
+ * This struct represents a single key for a MIDI keyboard.
+ * Each of these keys is associated with two buttons/triggers which are
  * connected to two different GPIO ports of the machine.
  * One key struct is created for every two GPIO ports/numbers passed via
  * the `gpio_mapping' kernel parameter.
  *
- * @KEY_STATE: The state is used to build a state machine like logic for
- *   every button; something like INACTIVE->TOUCHED->PRESSED->INACTIVE...
+ * @KEY_STATE: The current state of the key, used for determinig when to trigger note on and off events
  * @gpios: The two GPIOs which are used to build every button in hardware.
  * @irqs: The IRQ numbers for the corresponding GPIOs.
- * @hit_time: Time (in ns) when the button was hit/pressed.
+ * @hit_time: Time (in ns) when the start button was hit/pressed.
  * @timer_started: This is used to mitigate the jittering on every GPIO port.
  * @hrtimers: Those are used to set a timeout for sending MIDI events.
  * @note: The corresponding MIDI note.
@@ -149,10 +148,13 @@ struct key {
  * cmidid_gpio_state:
  *
  * The state of this GPIO component of our kernel module.
- * @keys: The array of available keys for our keyboard.
- * @num_keys: The total number of available keys.
- *
- * TODO: button_active_high is currently unused. Implement module params.
+ * @keys: The array of available keys for our keyboard
+ * @num_keys: the size of the keys array
+ * @button_active_high: the polarity of the buttons of each key
+ * @last_stroke_time: the time difference used for the last velocity computation; this is used for calibration
+ * @stroke_time_min: The minimum time difference between the activation of the start and end button of a key used to compute the velocity
+ * @stroke_time_max: The maximum time difference between the activation of the start and end button of a key used to compute the velocity
+ * @vel_curve: which velocity curve to use
  */
 struct cmidid_gpio_state {
 	struct key *keys;
@@ -164,43 +166,48 @@ struct cmidid_gpio_state {
 	VEL_CURVE vel_curve;
 };
 
-int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret);
-static unsigned char time_to_velocity(uint32_t t);
-static uint32_t stime64_to_utime32(s64 stime64);
-
 struct cmidid_gpio_state state;
 
-uint32_t set_min_stroke_time()
+static void handle_button_event(struct key *k, unsigned char button, bool active);
+static uint32_t stime64_to_utime32(s64 stime64);
+static unsigned char time_to_velocity(uint32_t t);
+static int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret);
+static struct key *get_key_from_timer(struct hrtimer *timer, unsigned char *index);
+static enum hrtimer_restart timer_irq(struct hrtimer *timer);
+static irqreturn_t irq_handler(int irq, void *dev_id);
+static bool is_valid(int gpio);
+
+uint32_t cmidid_set_min_stroke_time()
 {
 	dbg("min stroke time set to %d\n", state.last_stroke_time);
 	return state.stroke_time_max = state.last_stroke_time;
 }
 
-uint32_t set_max_stroke_time()
+uint32_t cmidid_set_max_stroke_time()
 {
 	dbg("max stroke time set to %d\n", state.last_stroke_time);
 	return state.stroke_time_max = state.last_stroke_time;
 }
 
-void set_vel_curve_linear()
+void cmidid_set_vel_curve_linear()
 {
 	dbg("velocity curve set to linear\n");
 	state.vel_curve = VEL_CURVE_LINEAR;
 }
 
-void set_vel_curve_concave()
+void cmidid_set_vel_curve_concave()
 {
 	dbg("velocity curve set to concave\n");
 	state.vel_curve = VEL_CURVE_CONCAVE;
 }
 
-void set_vel_curve_convex()
+void cmidid_set_vel_curve_convex()
 {
 	dbg("velocity curve set to convex\n");
 	state.vel_curve = VEL_CURVE_CONVEX;
 }
 
-void set_vel_curve_saturated()
+void cmidid_set_vel_curve_saturated()
 {
 	dbg("velocity curve set to saturated\n");
 	state.vel_curve = VEL_CURVE_SATURATED;
@@ -292,18 +299,20 @@ static uint32_t stime64_to_utime32(s64 stime64)
 }
 
 /*
- * time_to_velocity: Returns a MIDI velocity value between (usually 0 and 127)
- * for a given time in nanoseconds. This should probably be the time delay
- * between two successive button hits for a single key.
+ * time_to_velocity: Maps the measured time difference to a velocity.
+ * The state.vel_curve determines which function is used the interpolate
+ * between the minimum and maximum stroke time.
  *
- * @t: time value in ns
+ * @t: time value in 2^10 nanoseconds
  *
- * Return: The calculated velocity. Values < 0 are results of failed 
- *         calculations.
+ * Return: The calculated velocity.
  */
 static unsigned char time_to_velocity(uint32_t t)
 {
 	uint32_t a, b, c, t_sat;
+	
+	if (t <= state.stroke_time_min) return 127;
+	if (t >= state.stroke_time_max) return 0;
 
 	switch (state.vel_curve) {
 	case VEL_CURVE_LINEAR:
@@ -351,7 +360,7 @@ static unsigned char time_to_velocity(uint32_t t)
  *
  * Return: 0 if a struct could be found, -1 otherwise.
  */
-int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
+static int get_key_from_irq(int irq, struct key **k_ret, unsigned char *button_ret)
 {
 	struct key *k;
 
@@ -411,7 +420,7 @@ static struct key *get_key_from_timer(struct hrtimer *timer,
  *
  * Return: HRTIMER_NORESTART; the timer has to be reset manually.
  */
-enum hrtimer_restart timer_irq(struct hrtimer *timer)
+static enum hrtimer_restart timer_irq(struct hrtimer *timer)
 {
 	struct key *k;
 	int gpio_active;	// gpio_value_start, gpio_value_end;
@@ -521,7 +530,7 @@ static bool is_valid(int gpio)
  *
  * Return: A Linux error code.
  */
-int gpio_init(void)
+int cmidid_gpio_init(void)
 {
 	int i;
 	struct key *k;
@@ -675,7 +684,7 @@ int gpio_init(void)
  * gpio_exit: Exit/cleanup routine called by the __exit routine of the
  * actual module. Definitely, free everything here.
  */
-void gpio_exit(void)
+void cmidid_gpio_exit(void)
 {
 	int i;
 	dbg("GPIO component exiting...\n");

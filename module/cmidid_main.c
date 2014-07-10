@@ -72,7 +72,7 @@ static int __init cmidid_init(void)
 		goto err_midi_init;
 	}
 
-	if ((err = gpio_init()) < 0) {
+	if ((err = cmidid_gpio_init()) < 0) {
 		err("%d. Could not initialize GPIO component.\n", err);
 		goto err_gpio_init;
 	}
@@ -107,7 +107,7 @@ static void __exit cmidid_exit(void)
 {
 	dbg("Module exiting...\n");
 
-	gpio_exit();
+	cmidid_gpio_exit();
 	cmidid_midi_exit();
 
 	dbg("Unregistering char device\n");
@@ -134,20 +134,20 @@ static long cmidid_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 	dbg("ioctl called with: %d\n", cmd);
 	switch (cmd) {
 	case CMIDID_CALIBRATE_MIN_TIME:
-		return set_min_stroke_time();
+		return cmidid_set_min_stroke_time();
 	case CMIDID_CALIBRATE_MAX_TIME:
-		return set_max_stroke_time();
+		return cmidid_set_max_stroke_time();
 	case CMIDID_VEL_CURVE_LINEAR:
-		set_vel_curve_linear();
+		cmidid_set_vel_curve_linear();
 		break;
 	case CMIDID_VEL_CURVE_CONCAVE:
-		set_vel_curve_concave();
+		cmidid_set_vel_curve_concave();
 		break;
 	case CMIDID_VEL_CURVE_CONVEX:
-		set_vel_curve_convex();
+		cmidid_set_vel_curve_convex();
 		break;
 	case CMIDID_VEL_CURVE_SATURATED:
-		set_vel_curve_saturated();
+		cmidid_set_vel_curve_saturated();
 		break;
 	case CMIDID_TRANSPOSE:
 		return cmidid_transpose((signed char)arg) + 128;
