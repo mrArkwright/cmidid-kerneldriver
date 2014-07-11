@@ -234,15 +234,11 @@ values to a single MIDI keyboard key. The array should contain several triples
 of values, where the first two integers in each triple are the GPIO port
 numbers which will be used as input buttons for a keyboard key and the third
 value is the note associated with this key.
-So, e.g.
-```
-gpio_mapping=17,4,60
-```
-assigns the GPIO ports 17 and 4 as input buttons for a key. Port 17 is the
-start button and port 4 the end button, so that the key is considered touched
-if there's an interrupt event on port 17 and the key is pressed if there's
-a subsequent event on port 4. In this example, the MIDI note value 60 (= C4)
-is set for this key.
+So, e.g. `gpio_mapping=17,4,60` assigns the GPIO ports 17 and 4 as input 
+buttons for a key. Port 17 is the start button and port 4 the end button, so
+that the key is considered touched if there's an interrupt event on port 17
+and the key is pressed if there's a subsequent event on port 4. In this example,
+the MIDI note value 60 (= C4) is set for this key.
 __NOTE__: The size of this array must be a multiple of three and the maximum
 number of MIDI keys is defined in `cmidid_main.h` with `#define MAX_KEYS`.
 
