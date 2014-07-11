@@ -218,15 +218,25 @@ There information as the ssrc and the rtp payload type is prepended and finally 
 The kernel module responsible for the hardware access can be build directly in the folder `module` by using make.
 This kernel module needs some parameters as shown in the `module/start_module.sh` script.
 
-	insmod cmidid.ko gpio_mapping=17,4,60 jitter_res_time=10000000 start_button_active_high=0
+	insmod cmidid.ko gpio_mapping=17,4,60 jitter_res_time=1000000 start_button_active_high=0 end_button_active_high=0 stroke_time_min=68193 stroke_time_max=320616 midi_channel=0
 
 The `gpio_mapping` parameter is used to map a key to two buttons connected to gpios. As descriped in the presentation, the first button is pressed at the beginning of the key stroke and the second at the end. The third parameter is the pitch of the note the key should have. The number of arguments has to be a multiple of 3 to match this pattern. The maximum number of keys is defined in the `cmidid_main.h`
 
 	#define MAX_KEYS 88
 
-The `jitter_res_time` describes the time after the first rising or falling edge which should be used to determine the acutal value of the button. This value depends on the hardware button which was used.
+The `jitter_res_time` describes the time in nanoseconds after the first rising or falling edge which should be used to determine the acutal value of the button. This value depends on the hardware button which was used. After evaluating the log of interrupts 1ms (=10000000 ns) seemed like a good value. In this time all interrupts are ignored. 
+All notes are now send out delayed 1ms.
+This value is a tradeoff between acceptable delay and getting wrong notes.
 
-The `start_button_active_high` should be changed if a pull-down is used instead of a pull-up.
+The `start_button_active_high` and `end_button_active_high` should be changed if a pull-down is used instead of a pull-up.
+
+The `stroke_time_min` and `stroke_time_max` are used for calculating the velocity. So if the time difference between pushing the two buttons is smaller or equal to `stroke_time_min` the maximum velocity is used. Above the `stroke_time_max` the minimum velocity ist used. Between the to times it is possible to choose between different velocity curves.
+
+The `midi_channel` is used for notes. It has to be between 0 and 15. If more instruments send make music together over Ethernet, the software synthesizer must determine between the different devices. If every device uses a different channel the software can easily assign different instruments to the different devices.
+
+###ioctl configuration
+
+The kernel module creates a device  `/dev/cmidid` which is only used for ioctl communication. The user space programm `ioctl_test` has an UI and makes it easy to communicate with the module.
 
 ###Using local audio port
 
