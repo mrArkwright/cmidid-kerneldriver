@@ -229,7 +229,7 @@ after building the CMIDI module and load them accordingly. Currently only the mo
 
 The CMIDID module requires some parameters to specify the properties of the custom MIDI device.
 
-`gpio_mapping`: Maps from an integer array of GPIO port numbers and note
+* `gpio_mapping`: Maps from an integer array of GPIO port numbers and note
 values to a single MIDI keyboard key. The array should contain several triples
 of values, where the first two integers in each triple are the GPIO port
 numbers which will be used as input buttons for a keyboard key and the third
@@ -246,7 +246,7 @@ is set for this key.
 __NOTE__: The size of this array must be a multiple of three and the maximum
 number of MIDI keys is defined in `cmidid_main.h` with `#define MAX_KEYS`.
 
-`jitter_res_time`: Assuming that hardware buttons are connected to the GPIOs,
+* `jitter_res_time`: Assuming that hardware buttons are connected to the GPIOs,
 there's the possiblity to use software resolution of button jittering/bouncing.
 This parameter specifies the time (in nanoseconds) after an interrupt event on
 a GPIO port, during which subsequent interrupts are ignored.
@@ -254,14 +254,14 @@ According to the tests we did, setting `jitter_res_time=1000000` (= 1 ms) is a
 reasonable choice. Note that this will delay the note-on and note-off events
 sent after a key press by the same amount of time.
 
-`start_button_active_high` and `end_button_active_high`: Those values should
+* `start_button_active_high` and `end_button_active_high`: Those values should
 be set to 0 or 1, depending on whether the hardware input buttons are connected
 to pull-up or pull-down circuits. Assigning `start_button_active_high=1` will
 consider the first button (of each custom keyboard key) pressed, if there's
 a rising edge event on the corresponding GPIO port.
 __NOTE__: Values other than 0 and 1 will result in undefined behaviour.
 
-`stroke_time_min` and `stroke_time_max`: These parameters are used to set
+* `stroke_time_min` and `stroke_time_max`: These parameters are used to set
 the key hit time thresholds (in nanoseconds) which are used to determine
 the maximum and minimum key hit velocity. If the time delay between hitting
 the start and the end button for a single key is less than or equal to
@@ -271,20 +271,22 @@ the `stroke_time_max`, the event velocity will be zero.
 IOCTl can be used to specify the interpolation function, which calculates the
 velocity values inbetween.
 
-`midi_channel`: An integer value from 0 to 15 which sets the MIDI channel for
+* midi_channel`: An integer value from 0 to 15 which sets the MIDI channel for
 the CMIDID MIDI device. This can be used by MIDI synthesizers which receive
 MIDI events on mutliple channels to assign a unique instrument to each channel.
 
 ### IOCTL Configuration
 
 The kernel module creates a device  `/dev/cmidid` which is only used for ioctl
-communication. The user space programm `module/ioctl_test` has an UI and makes
-it easy to communicate with the module. The source `module/ioctl_test.c` can
+communication. The user space programm `module/ioctl_test` has a commandline
+interface to communicate with the module. The source `module/ioctl_test.c` can
 be used as a reference for the available ioctl commands.
 
-Ioctl can be used to set various interpolation function for the note-on event
+Ioctl can be used to set various interpolation functions for the MIDI event
 velocities and it can be used for transposing, i.e. adding a constant
 (positive or negative) value to each sent MIDI note.
+
+The availabe command values are defined in `cmidid_ioctl.h`.
 
 ### Using the Local Audio Port
 
