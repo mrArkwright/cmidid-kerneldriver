@@ -1,0 +1,63 @@
+\documentclass[paper=a4,fontsize=11pt,pagesize,bibtotoc]{scrartcl}
+
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+\usepackage[osf]{mathpazo} 
+\usepackage{microtype}
+\usepackage{tikz}
+\usepackage{amsthm, amssymb, amsmath}
+\usepackage{graphicx}
+\usepackage{color}
+
+\parindent0pt
+
+
+\title{AppleMIDI}
+\subtitle{Linux Kernel Driver Implementation}
+\author{Felix Engelmann}
+
+\begin{document}
+	\maketitle
+	
+	As event based storage of music nearly disappeared completely from standard users, the 
+	%TODO: full name aof midi abbreviation
+	MIDI 
+	is still the choice for digital instruments by professional musicians. The protocol is designed to transmit or store as many information as possible about the production of a tone. This normally includes the time at beginning of an event with the velocity of the beginning, which normally is related to the volume of the synthesized tone and a signal for the end, respectively the release of a key. Additionally to sound event transmission, there exists also a lot of control commands, e.g.:
+	%TODO: list control commands of midi
+	Depending on the command, it is encoded by 2 to 4 bytes.
+	
+	By the original standard, the signals are transmitted via a special 5 pin cable. With the wide acceptance of USB an implementation of MIDI over USB arose quickly because it replaced the need for a dedicated port and enabled an convenient way to plug multiple devices to one computer through a hub. But then there are still restrictions of USB. A better and also established model for transmission is an IP based network which can be on top of any hardware layer.
+	
+	To accomplish that, a group at the University of Berkeley wrote an RFC for MIDI over RTP. Our Work was to enable this possibility in the linux kernel to interconnect linux computer with midi links.
+	
+	\section{Related Work}
+	Along with the RFC there exists a small reference implementation by 
+	%TODO: Authors
+	with the core functionality, but they advise to not use it as a library. But it provides valuable insight for complex parts.
+	
+	To enable RTPMIDI on Windows,
+	%TODO: Author
+	provides a driver. As it is a commercial product, it os closed source and therefore not helpful in any way.
+	
+	With the wide distribution of tablets it got more and more common to replace expensive MIDI-pads with virtual ones or any other ideas of apps with which it is possible to create sounds and send them over the network to a synthesizer. On Android, the nmj is a closed source java library.
+	
+	The apple operating systems also include applemidi as part of the coreaudio framework.
+	
+	%TODO: open source: nodejs rtpmidi, midikit
+	
+	\section{RTPMIDI}
+	The original as well as the updated RFC
+	%TODO: cite
+	are only specifying the transmission of MIDI commands as payload of a Real Time Protocol packet. this is transmitted within a UDP datagram. But it does not include a specification for the session management. It only refers to using some sort of session description protocol
+	%TODO: cite SDP
+	, e.g. SIP, which is also used to initiate phone and video calls over RTP.
+	
+	
+	
+	
+	
+	
+	
+\end{document}
