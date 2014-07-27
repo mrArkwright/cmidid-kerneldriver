@@ -47,12 +47,36 @@
 	
 	%TODO: open source: nodejs rtpmidi, midikit
 	
+	There are also two open source implementations. 
+	%TODO: nodejs author
+	created an javascript version in nodejs. This has the advantage of high abstraction and provides a simple, easy to use interface. For building a bidirectional bridge, it is only required to implement receive hooks for each direction with one send cal to the other adapter.
+	
+	Im our test on the raspberry it served a good purpose as proof of concept to transfer midi over RTP. But due to the additional abstraction of the nodejs engine on the rather weak ARM, the processing time introduced a delay of about 6\,ms. This is too long for live performances.
+	
+	To get rid of the abstraction induced delay, 
+	%TODO:midikit author
+	implemented a universal adapter or alsa and RTP Midi directly in C. It is designed to be used in user-space applications with a run-loop to provide connectivity in non-blocking way. This is the code base of our driver, as all the management and book-keeping functions can be used as-is in the kernel.
+	
 	\section{RTPMIDI}
 	The original as well as the updated RFC
 	%TODO: cite
 	are only specifying the transmission of MIDI commands as payload of a Real Time Protocol packet. this is transmitted within a UDP datagram. But it does not include a specification for the session management. It only refers to using some sort of session description protocol
 	%TODO: cite SDP
 	, e.g. SIP, which is also used to initiate phone and video calls over RTP.
+	
+	
+	To minimize the divergence of combinations ant the resulting incompatibilities, Apple decided to use a standardized session session protocol. This is closely coupled to the RTPMidi transmission. Unfortunately the author decided to not publish the specification, however it found a broad acceptance. Because it is very simple, it was reverse engineered and there even exists a wireshark dissector to monitor the packets and their content.
+	
+	The state-machine of the session management is depicted in figure \ref{fig:state}
+	
+	
+	The Applemidi communicates over two consecutive ports where an invitation and termination is required for both. The lower, normally even, default 5004, port is used for control commands. These include feedback, which provides the functionality of acknowledging received commands by the sequence number. The upper port is used for synchronization and the RTP connection.
+	
+	Parameters as the time-divisor,...
+	%TODO: fixed parameters
+	which are otherwise exchanged at session invitation are kept fix at predefined values.
+	
+	 
 	
 	
 	
