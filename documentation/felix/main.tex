@@ -76,9 +76,20 @@
 	%TODO: fixed parameters
 	which are otherwise exchanged at session invitation are kept fix at predefined values.
 	
-	 
+	\section{Global Structure}
 	
+	As most of the code-base was ported from the midikit project, it dictated the global structure of the driver. As it should act like a bridge, it is connected to the sequencer core for receiving midi commands and provides a listening network socket, where peers can subscribe and receive data. There is a handler for each interface to accept and forward or process the received events.
 	
+	During initialization of the module, the sockets are set up and the connection as a virtual midi output device is created. In addition, internal data structures are allocated to store information about the driver itself, as well as a list of connected peers. All these structures are freed on removal. This includes the proper disconnection of all active peers.
+	
+	\subsection{Networking}
+	
+	Networking in the kernel can be done for multiple purposes. For our use-case it is only necessary to get a very height level access to the networking stack. 
+	
+	Handling with network clients normally does not require to be in kernel-space. Even further, running complex sever functionality in the kernel can introduce severe security issues. If there is a remote exploit for this module, there are no right barriers ant the attacker has immediately full access to the whole system. The wise spread apache server even forks a complete new process with its own address space to separate each request. With this, a compromised request can not influence or damage the complete system easily.
+	This encapsulation is not possible in the kernel, as all modules run in the same memory space without any shielding. Nevertheless it is possible to create a server as a module.
+	
+	For a convenient way to interoperate with the networking stack, the netpoll api offers all necessary functionality. An other way to create a socket is by using the system calls which are also used from user-space. Concerning performance, all three options are orders of magnitude faster than the delay of the actual ethernet transmission over the link. But there exists cases, for example it there is no user-space management on very small embedded devices, where it is necessary to use the kernel version.
 	
 	
 	
