@@ -1,0 +1,41 @@
+\documentclass[paper=a4,fontsize=11pt,pagesize,bibtotoc]{scrartcl}
+
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+\usepackage[osf]{mathpazo} 
+\usepackage{microtype}
+\usepackage{tikz}
+\usepackage{amsthm, amssymb, amsmath}
+\usepackage{graphicx}
+\usepackage{color}
+
+\usepackage{xr-hyper}
+\usepackage{hyperref}
+
+\externaldocument{andreas/main}
+\parindent0pt
+
+
+\title{cmidid documentation}
+\subtitle{Linux Kernel Driver Implementation}
+\author{Felix E. , Michael O. , Andreas R. and Jannik T.}
+
+\begin{document}
+	\maketitle
+	
+The cmidid driver was developed during the lab "Linux and C" at the TUM. The following sections give a brief overview about the different parts of the driver. Most of the driver was developed in close teamwork, however everybody focused on a certain part. In the personal documentation the special part is described in a more detailed way.
+
+\section{structure}
+\section{electrical implementation and key logic}
+\section{ALSA}
+The driver must be able to generated midi events and send them to the midi system of the kernel which is ALSA by default. The ALSA midi connection manager can be easily configured to route the midi stream either directly to a synthesiser and play the sound directly on the device or route it to the applemidi module which streams it to the network. 
+A more detailed description can be found in the documentation of Andreas in section \ref{alsa}.
+\section{time measurement}
+\section{gpio}
+\section{configuration}
+\section{applemidi}
+This part was implemented in a separated kernel module, so that this optional part which is only necessary for network communication can me dynamically loaded and also be reused in other scenarios. 
+
+\end{document}
