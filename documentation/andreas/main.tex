@@ -1,0 +1,39 @@
+\documentclass[paper=a4,fontsize=11pt,pagesize,bibtotoc]{scrartcl}
+
+\usepackage[utf8]{inputenc} 
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+\usepackage[osf]{mathpazo} 
+\usepackage{microtype}
+\usepackage{tikz}
+\usepackage{amsthm, amssymb, amsmath}
+\usepackage{graphicx}
+\usepackage{color}
+
+\usepackage{xr-hyper}
+\usepackage{hyperref}
+
+\parindent0pt
+
+
+\title{cmidid documentation - alsa and gpio }
+\subtitle{Linux Kernel Driver Implementation}
+\author{Andreas R.}
+
+\begin{document}
+	\maketitle
+	
+This part of the documentation will provide information on the communication with the alsa sequencer and the interaction with the buttons of the keyboard connected over the GPIO Pins.
+\section{Related Work}
+Should we do related work in an documentation? This shouldn't be a scientific paper right?
+
+\section{Alsa}
+\label{alsa}
+ALSA was initially developed by Jaroslav Kysela as replacement for the OSS/Free audio/midi subsystem which had a lack of features and didn't support most of the new sound cards. Since kernel version 2.6 ALSA is the default sound system used by the kernel.
+\cite{Phillips:2005:UGA:1080072.1080075}
+\bibliography{sources}{}
+\bibliographystyle{plain}
+	
+	
+\end{document}
