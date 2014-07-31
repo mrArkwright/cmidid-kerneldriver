@@ -1,0 +1,9 @@
+documentation.pdf
+documentation.log
+documentation.out
+documentation.fls
+documentation.aux
+documentation.fdb_latexmk
+
+*.log
+

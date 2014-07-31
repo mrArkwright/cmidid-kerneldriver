@@ -1,0 +1,216 @@
+% documentation.tex
+%
+% Using the Alternate ACM Sig Proceedings style.
+% Get it at:
+%   http://www.acm.org/sigs/publications/proceedings-templates
+%
+
+\documentclass{sig-alternate}
+
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+\usepackage{tikz}
+\usepackage{amssymb,amsmath}
+\usepackage{graphicx}
+\usepackage{color}
+
+\usepackage{listings}
+
+% Customize the appearance of code listings:
+\lstset{
+  basicstyle=\ttfamily,
+  numbers=none,
+  stepnumber=5,
+  tabsize=2,
+  firstnumber=1,
+  numberfirstline=false,
+  numberstyle=\ttfamily,
+  frame=single,
+}
+
+\usepackage{hyperref}
+
+% Customize the appearance of hyperlinks and of the pdf reader:
+\hypersetup{
+  colorlinks=true, % removes border, allows text coloring
+  urlcolor=blue, % color for weblinks/email
+  pdfborderstyle={/S/U/W 1} % 1pt underline (instead of a box)
+}
+
+% Remove the annoying ACM copyright notice:
+\makeatletter
+\def\@copyrightspace{\relax}
+\makeatother
+
+\begin{document}
+
+\title{CMIDID Kernel Driver \& Linux AppleMIDI\\Documentation}
+\subtitle{Praktikum Linux \& C - Technische Universität München}
+
+\numberofauthors{4}
+
+\author{
+\alignauthor
+Felix Engelmann\email{\texttt{felix.engelmann@tum.de}}
+\alignauthor
+Michael Opitz\email{\texttt{opitz@in.tum.de}}
+\alignauthor
+Andreas Ruhland\email{\texttt{ruhland@in.tum.de}}
+\and
+\alignauthor
+Jannik Theiß\email{\texttt{jannik.theiß@tum.de}}
+}
+
+\maketitle
+
+\section{Overview}
+\label{documentation:overview}
+
+\subsection{Introduction}
+\label{overview:intro}
+
+This document is split up into two main parts: The documentation for the 
+\emph{CMIDID} Linux kernel driver and the documentation for the 
+\emph{AppleMIDI} kernel driver. Development on both started in the summer 
+2014 during the \emph{Linux- und C} internship at \emph{TUM}. The original 
+goal of this project was to build a Linux kernel driver which implements 
+the \emph{RPT MIDI} standard (as described in 
+\href{http://tools.ietf.org/html/rfc6295}{RFC 6295}), yet after some initial 
+discussion, the decision was made to focus developement on the CMIDID driver, 
+which enabled us to build custom MIDI hardware with low-cost devices like, in 
+our case, the \href{www.raspberryp.org}{Raspberry Pi}. Later during the 
+development phase, after some promising progress on the CMIDID project, we 
+started to implement a altered version of the RTP MIDI driver in the 
+form of the \emph{AppleMIDI} driver, which supports only a subset of the 
+complete RTP MIDI standard, yet understands the Apple RTP MIDI session 
+management - an extension of standard.
+
+The remainder of this document describes the main components and challenges 
+of this project in detail. For a short overview of the implemented 
+functionality and the possiblities available with CMIDID and Linux AppleMIDI, 
+take a look at the project presentation in \texttt{/presentation/} and if 
+you are looking for an introduction to build and test the drivers, read the 
+\texttt{README.md}.
+
+\subsection{CMIDID Kernel Driver}
+\label{overview:cmidid}
+
+The CMIDID Linux kernel driver can be used to build a fake MIDI keyboard 
+by translating input on GPIO pins into arbitrary MIDI key events. For our 
+demo setup, we used a Raspberry Pi with an attached breadboard to build
+several MIDI keys via buttons, resistors and jumper cables. The CMIDID driver 
+is highly customizable, and can, for example, use the input on two separate 
+GPIOs to simulate a single MIDI key, with the added benefit, that the time 
+difference between the GPIO events allows the calculation of the corresponding 
+key hit velocity. With that in mind, it's possible to construct more advanced 
+MIDI hardware compared to other projects with a similar scope (like, e.g. the 
+\emph{Makey Makey} controller @ \url{http://makeymakey.com}).
+
+\subsubsection{Authors}
+\label{cmidid:authors}
+
+CMIDID was written by Michael Opitz, Andreas Ruhland and Jannik Theiß in 
+collaboration. TODO: ADD SHORT OVERVIEW HOW WE DISTRIBUTED THE WORKLOAD.
+I CAN'T REMEMBER EXACTLY...
+
+\subsubsection{Module Structure}
+\label{cmidid:structure}
+
+The CMIDID module is split up into several components which was done in 
+favor of good separation of concerns. The module is composed of three 
+components: The main component, the GPIO component and the MIDI component.
+The main component handles mostly the setup and cleanup of the other 
+components as well IOCTL. The MIDI component handles the creation and control 
+of the corresponding virtual MIDI device and the GPIO component translates 
+GPIO input into MIDI events.
+
+LINK TO INDEPTH DISCUSSION OF MODULE STRUCTURE: MICHAEL
+
+\subsubsection{Hardware}
+\label{cmidid:hardware}
+
+The CMIDID driver is intended to be run on a Raspberry Pi, which comes with 
+several GPIO ports for simple hardware prototyping and which is able to run 
+a Linux kernel as well as general purpose applications. In theory, every 
+devices which supports Linux and has GPIO pins can be used to replicate our 
+setup. Considering that we need to have software for audio processing, e.g.
+an Arduino board is not a reasonable choice to build CMDIDID keyboards.
+
+An introduction on the challenges of compling and running CMIDID on the 
+Raspberry Pi can be found here:
+
+LINK TO RASPBERRY PI SETUP: ANDI
+
+\subsubsection{Custom Keyboards}
+\label{cmidid:keyboards}
+
+Custom MIDI keyboard key events are simulated by interpreting input on the 
+GPIO ports as key hits and key releases. This allows flexibility for the 
+construction of custom hardware, but has the downside of increased hardware 
+prototyping time and more involved driver configuration.
+
+An overview of our sample keyboard setup on a breadboard can be found here:
+
+LINK TO KEY CONSTRUCTION: JANNIK
+
+\subsubsection{Module Configuration}
+\label{cmidid:configuration}
+
+The flexiblity of hardware development is probably the greatest advantage of 
+the CMIDID module. To simpliy the process of MIDI keyboard construction, we 
+added several ways to configure the module and the driver. It's possible to 
+pass module parameters to define options which won't change during module 
+runtime, like the number of available GPIO pins and the CMIDID driver can 
+be configured during runtime via IOCTL from the userspace, which can be used 
+for example to transpose the MIDI notes, i.e. add a constant to every note 
+event.
+
+The available configuration options are listed in:
+
+LINK TO CMIDID CONFIGURATION: JANNIK
+
+\subsubsection{Virtual MIDI device}
+\label{cmidid:midi}
+
+Besides the construction of the keyboard hardware, a virtual software based 
+MIDI device is provided to communicate with other sound processing hardware 
+like for example a software synthesize like FluidSynth 
+(\url{http://www.fluidsynth.org}) or TiMidity++ 
+(\url{http://timidity.sourceforge.net}). Fortunatley, the Linux kernel 
+offers an interface to easily add MIDI devices to the existing sound 
+infrastructure: the ALSA sequencer API. This API offers methods for MIDI 
+device creation and manipulation and can be used from the userspace to 
+route MIDI events between different devices.
+
+Check out the this section to see how we used the ALSA sequencer API for
+our this project:
+
+LINK TO MIDI DEVICE CREATION/ALSA SECTION: ANDI
+
+\subsubsection{GPIO Handling}
+\label{cmidid:gpio}
+
+The GPIO component of CMIDID module handles incoming triggers on the GPIO 
+pins. Depending on the configuration, rising edge and falling edge events 
+are interpreted as MIDI key hits and subsequent releases. Those signals are 
+translated into a specific MIDI event: Either noteon or noteoff. Additionally, 
+the GPIO component is responsible for the calculation of the velocity for 
+the noteon events. This is done by measuring the time difference between 
+the virtual key hits and interpolating the velocity according to a given 
+interpolation function.
+
+For more details on the handling of GPIO input, see:
+
+LINK TO GPIO SECTION: MICHAEL
+
+\subsection{AppleMIDI}
+\label{overview:applemidi}
+
+
+
+\subsubsection{Authors}
+\label{applemidi:authors}
+
+\end{document}
+
