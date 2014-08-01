@@ -1,4 +1,4 @@
-\documentclass[paper=a4,fontsize=11pt,pagesize,bibtotoc]{scrartcl}
+\documentclass[paper=a4,fontsize=11pt,twocolumn,pagesize,bibtotoc]{scrartcl}
 
 \usepackage[utf8]{inputenc} 
 \usepackage[T1]{fontenc}
@@ -7,6 +7,7 @@
 \usepackage[osf]{mathpazo} 
 \usepackage{microtype}
 \usepackage{tikz}
+\usetikzlibrary{automata}
 \usepackage{amsthm, amssymb, amsmath}
 \usepackage{graphicx}
 \usepackage{color}
@@ -65,8 +66,17 @@
 	
 	\begin{figure}
 		\centering
-		\begin{tikzpicture}
-			
+		\begin{tikzpicture}[node distance=3cm,bend angle=10]
+	        \node[state,minimum size=1.7cm] at (0,0)   (wait) {waiting};
+	        \node[state,minimum size=1.7cm] at (2,-3.5)  (in) {invited};
+	        \node[state,minimum size=1.7cm] at (-2,-3.5)  (act) {active};
+		
+			\path[-latex] (wait) edge[bend left] node[sloped,above] {IN} (in)
+							(in) edge node[sloped,below] {accept|OK} (act)
+								edge [bend left] node[sloped,below] {decline|NO} (wait)
+							(act) edge node[sloped,above] {end|BY} (wait);
+			%\path[-latex] (press) edge [loop below] node {$b_2|$on\&off} ();
+			%\path[-latex] (act) edge [loop left] node {$\neg b_1|$off} ();
 		\end{tikzpicture}
 		\caption{state-machine of applemidi}
 		\label{fig:state}
@@ -134,9 +144,14 @@
 	The RTPMIDI is then embedded into a RTP packet and finally sent in a UDP datagram to all peers.
 	
 	
+	\section{Conclusion}
 	
+	The AppleMIDI driver is the choice for building digital music instruments with low power devices. It provides connection to a wide range of applications on all common operating systems.
 	
+	The use of a kernel module instead of a well separated user space program is only justified if there is not enough computation power. An example setup might be on a raspberry pi with the cmidid module for keys attached to gpio.
 	
+	Over all, it demonstrates the possibility and straightforwardness of porting a complex user space program to the kernel without libc including networking and sound connections.
+	 
 	
 	
 	
