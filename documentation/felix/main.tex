@@ -54,13 +54,13 @@
 	implemented a universal adapter or alsa and RTP Midi directly in C. It is designed to be used in user-space applications with a run-loop to provide connectivity in non-blocking way. This is the code base of our driver, as all the management and book-keeping functions can be used as-is in the kernel.
 	
 	\section{RTPMIDI}
-	The original (RFC 4695) as well as the updated RFC 6295
+	The original (RFC 4695\cite{rfc4695}) as well as the updated RFC 6295\cite{rfc6295}
 	%TODO: cite
 	are only specifying the transmission of MIDI commands as payload of a Real Time Protocol packet. this is transmitted within a UDP datagram. But it does not include a specification for the session management. It only refers to using some sort of session description protocol
-	(RFC 4566), e.g. SIP, which is also used to initiate phone and video calls over RTP.
+	(RFC 4566\cite{rfc4566}), e.g. SIP, which is also used to initiate phone and video calls over RTP.
 	
 	
-	To minimize the divergence of combinations ant the resulting incompatibilities, Apple decided to use a standardized session session protocol. This is closely coupled to the RTPMidi transmission. Unfortunately the author decided to not publish the specification, however it found a broad acceptance. Because it is very simple, it was reverse engineered and there even exists a wireshark dissector to monitor the packets and their content.
+	To minimize the divergence of combinations ant the resulting incompatibilities, Apple decided to use a standardized session session protocol. This is closely coupled to the RTPMidi transmission. Unfortunately the author decided to not publish the specification, however it found a broad acceptance. Because it is very simple, it was reverse engineered and there even exists a wireshark dissector\footnote{https://www.wireshark.org/docs/dfref/a/applemidi.html} to monitor the packets and their content.
 	
 	The state-machine of the session management is depicted in figure \ref{fig:state}.
 	
@@ -152,7 +152,15 @@
 	
 	Over all, it demonstrates the possibility and straightforwardness of porting a complex user space program to the kernel without libc including networking and sound connections.
 	 
+	\bibliographystyle{abbrv}
+	\begin{thebibliography}{99}
 	
+	
+	\bibitem{rfc4695} J. Lazzaro and J. Wawrzynek, \emph{RTP Payload Format for MIDI}, Request for Comments 4695, IETF, Nov. 2006
+	\bibitem{rfc6295} J. Lazzaro and J. Wawrzynek, \emph{RTP Payload Format for MIDI}, Request for Comments 6295, IETF, Jun. 2011
+	\bibitem{rfc4566} M. Handley, V. Jacobson and C. Perkins, \emph{SDP: Session Description Protocol}, Request for Comments 4566, IETF, Jul. 2006
+	
+	\end{thebibliography}
 	
 	
 \end{document}
