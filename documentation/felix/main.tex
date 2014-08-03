@@ -11,6 +11,7 @@
 \usepackage{amsthm, amssymb, amsmath}
 \usepackage{graphicx}
 \usepackage{color}
+\usepackage{hyperref}
 
 \parindent0pt
 
@@ -23,44 +24,44 @@
 	\maketitle
 	
 	As event based storage of music nearly disappeared completely from standard users, the 
-	Musical Instrument Digital Interface
-	is still the choice for digital instruments by professional musicians. The protocol is designed to transmit or store as many information as possible about the production of a tone. This normally includes the time at beginning of an event with the velocity of the beginning, which normally is related to the volume of the synthesized tone and a signal for the end, respectively the release of a key. Additionally to sound event transmission, there exists also a lot of control commands, e.g.: volume, balance, \dots
+	Musical Instrument Digital Interface (MIDI)
+	is still the choice for digital instruments by professional musicians. The protocol is designed to transmit or store as many information as possible about the production of a tone. This normally includes the time at the beginning of an event with the velocity of the beginning, which normally is related to the volume of the synthesized tone and a signal for the end, respectively the release of a key. Additionally to sound event transmission, there exists also a lot of control commands, e.g.: volume, balance, \dots
 	Depending on the command, it is encoded by 2 to 4 bytes.
 	
 	By the original standard, the signals are transmitted via a special 5 pin cable. With the wide acceptance of USB an implementation of MIDI over USB arose quickly because it replaced the need for a dedicated port and enabled an convenient way to plug multiple devices to one computer through a hub. But then there are still restrictions of USB. A better and also established model for transmission is an IP based network which can be on top of any hardware layer.
 	
-	To accomplish that, a group at the University of Berkeley wrote an RFC for MIDI over RTP. Our Work was to enable this possibility in the linux kernel to interconnect linux computer with midi links.
+	To accomplish that, a group at the University of Berkeley wrote an RFC for MIDI over RTP. Our Work was to enable this possibility in the linux kernel to interconnect linux computer with MIDI links.
 	
-	\section{Related Work}
+	\section[Related Work]{Related Work\footnote{\url{http://www.cs.berkeley.edu/\~lazzaro/rtpmidi/}}}
 	Along with the RFC 6295 there exists a small reference implementation by 
 	J. Lazzaro, J. Wawrzynek
-	with the core functionality, but they advise to not use it as a library. But it provides valuable insight for complex parts.
+	with the core functionality, but they advise to not use it as a library. Nevertheless, it provides valuable insight for the complex parts.
 	
 	To enable RTPMIDI on Windows,
 	Tobias Erichsen
-	provides a driver. As it is a commercial product, it os closed source and therefore not helpful in any way.
+	provides a driver. As it is a commercial product, it is closed source and therefore not helpful in any way.
 	
 	With the wide distribution of tablets it got more and more common to replace expensive MIDI-pads with virtual ones or any other ideas of apps with which it is possible to create sounds and send them over the network to a synthesizer. On Android, the nmj is a closed source java library.
 	
-	The apple operating systems also include applemidi as part of the coreaudio framework.
+	The apple operating systems also includes AppleMIDI as part of the coreaudio framework.
 	
 	There are also two open source implementations. 
-	Jascha Dachtera created an javascript version in nodejs. This has the advantage of high abstraction and provides a simple, easy to use interface. For building a bidirectional bridge, it is only required to implement receive hooks for each direction with one send cal to the other adapter.
+	Jascha Dachtera created a javascript version in nodejs. This has the advantage of high abstraction and provides a simple, easy to use interface. For building a bidirectional bridge, it is only required to implement receive hooks for each direction with one send call to the other adapter.
 	
-	Im our test on the raspberry it served a good purpose as proof of concept to transfer midi over RTP. But due to the additional abstraction of the nodejs engine on the rather weak ARM, the processing time introduced a delay of about 6\,ms. This is too long for live performances.
+	Im our test on the raspberry pi, it served a good purpose as proof of concept to transfer MIDI over RTP. But due to the additional abstraction of the nodejs engine on the rather weak ARM, the processing time introduced a delay of about 6\,ms. This is too long for live performances.
 	
 	To get rid of the abstraction induced delay, 
 	 Jonas Pommerening 
-	implemented a universal adapter or alsa and RTP Midi directly in C. It is designed to be used in user-space applications with a run-loop to provide connectivity in non-blocking way. This is the code base of our driver, as all the management and book-keeping functions can be used as-is in the kernel.
+	implemented a universal adapter for alsa and RTPMIDI directly in C. It is designed to be used in user-space applications with a run-loop to provide connectivity in a non-blocking way. This is the code base of our driver, as all the management and book-keeping functions can be used as-is in the kernel.
 	
 	\section{RTPMIDI}
 	The original (RFC 4695\cite{rfc4695}) as well as the updated RFC 6295\cite{rfc6295}
 	%TODO: cite
-	are only specifying the transmission of MIDI commands as payload of a Real Time Protocol packet. this is transmitted within a UDP datagram. But it does not include a specification for the session management. It only refers to using some sort of session description protocol
+	are only specifying the transmission of MIDI commands as payload of a Real Time Protocol packet. This is transmitted within a UDP datagram. But it does not include a specification for the session management. It only refers to using some sort of session description protocol
 	(RFC 4566\cite{rfc4566}), e.g. SIP, which is also used to initiate phone and video calls over RTP.
 	
 	
-	To minimize the divergence of combinations ant the resulting incompatibilities, Apple decided to use a standardized session session protocol. This is closely coupled to the RTPMidi transmission. Unfortunately the author decided to not publish the specification, however it found a broad acceptance. Because it is very simple, it was reverse engineered and there even exists a wireshark dissector\footnote{https://www.wireshark.org/docs/dfref/a/applemidi.html} to monitor the packets and their content.
+	To minimize the divergence of combinations and the resulting incompatibilities, Apple decided to use a standardized session protocol. This is closely coupled to the RTPMIDI transmission. Unfortunately the author decided to not publish the specification, however it found a broad acceptance. Because it is very simple, it was reverse engineered and there even exists a wireshark dissector\footnote{\url{https://www.wireshark.org/docs/dfref/a/applemidi.html}} to monitor the packets and their content.
 	
 	The state-machine of the session management is depicted in figure \ref{fig:state}.
 	
@@ -78,33 +79,33 @@
 			%\path[-latex] (press) edge [loop below] node {$b_2|$on\&off} ();
 			%\path[-latex] (act) edge [loop left] node {$\neg b_1|$off} ();
 		\end{tikzpicture}
-		\caption{state-machine of applemidi}
+		\caption{state-machine of AppleMIDI}
 		\label{fig:state}
 	\end{figure}
 	
-	The Applemidi communicates over two consecutive ports where an invitation and termination is required for both. The lower, normally even, default 5004, port is used for control commands. These include feedback, which provides the functionality of acknowledging received commands by the sequence number. The upper port is used for synchronization and the RTP connection.
+	The AppleMIDI communicates over two consecutive UDP ports where an invitation and termination is required for both. The lower, normally even, default 5004, port is used for control commands. These include feedback, which provides the functionality of acknowledging received commands by the sequence number. The upper port is used for synchronization and the RTP connection.
 	
 	Parameters as the time-divisor
 	which are otherwise exchanged at session invitation are kept fix at predefined values.
 	
 	\section{Global Structure}
 	
-	As most of the code-base was ported from the midikit project, it dictated the global structure of the driver. As it should act like a bridge, it is connected to the sequencer core for receiving midi commands and provides a listening network socket, where peers can subscribe and receive data. There is a handler for each interface to accept and forward or process the received events.
+	As most of the code-base was ported from the midikit project, it dictated the global structure of the driver. As it should act like a bridge, it is connected to the sequencer core for receiving MIDI commands and provides a listening network socket, where peers can subscribe and receive data. There is a handler for each interface to accept and forward or process the received events.
 	
-	During initialization of the module, the sockets are set up and the connection as a virtual midi output device is created. In addition, internal data structures are allocated to store information about the driver itself, as well as a list of connected peers. All these structures are freed on removal. This includes the proper disconnection of all active peers.
+	During initialization of the module, the sockets are set up and the connection as a virtual MIDI output device is created. In addition, internal data structures are allocated to store information about the driver itself, as well as a list of connected peers. All these structures are freed on removal. This includes the proper disconnection of all active peers.
 	
 	\subsection{Networking}
 	
-	Networking in the kernel can be done for multiple purposes. For our use-case it is only necessary to get a very height level access to the networking stack. 
+	Networking in the kernel can be done for multiple purposes. For our use-case it is only necessary to get a very heigh level access to the networking stack. 
 	
-	Handling with network clients normally does not require to be in kernel-space. Even further, running complex sever functionality in the kernel can introduce severe security issues. If there is a remote exploit for this module, there are no right barriers ant the attacker has immediately full access to the whole system. The wise spread apache server even forks a complete new process with its own address space to separate each request. With this, a compromised request can not influence or damage the complete system easily.
+	Handling with network clients normally does not require to be in kernel-space. Even further, running complex sever functionality in the kernel can introduce severe security issues. If there is a remote exploit for this module, there are no right barriers and the attacker has immediately full access to the whole system. The wide spread apache server even forks a complete new process with its own address space to separate each request. With this, a compromised request can not influence or damage the complete system easily.
 	This encapsulation is not possible in the kernel, as all modules run in the same memory space without any shielding. Nevertheless it is possible to create a server as a module.
 	
-	For a convenient way to interoperate with the networking stack, the netpoll api offers all necessary functionality. An other way to create a socket is by using the system calls which are also used from user-space. Concerning performance, all three options are orders of magnitude faster than the delay of the actual ethernet transmission over the link. But there exists cases, for example it there is no user-space management on very small embedded devices, where it is necessary to use the kernel version.
+	For a convenient way to interoperate with the networking stack, the netpoll api offers all necessary functionality. An other way to create a socket is by using the system calls which are also used from user-space. Concerning performance, all three options are orders of magnitude faster than the delay of the actual ethernet transmission over the link. But there exists cases, for example if there is no user-space management on very small embedded devices, where it is necessary to use the kernel version.
 	
 	\subsubsection{Sockets}
 	
-	Within the kernel the opened sockets are not handles by file descriptors, but directly by a pointer to the \texttt{struct socket}. Instead of calling select from user-space to be notified when data is ready to read, a callback function can be set directly as a struct member. It is called in an asynchronous context whenever a packet with the specifies properties is received. In our case this means, that we only want Datagram, IPv4 packets. Because the socket is bound to a specific port, only packets arriving there are reported.
+	Within the kernel, the opened sockets are not handled by file descriptors, but directly by a pointer to the \texttt{struct socket}. Instead of calling select from user-space to be notified when data is ready to read, a callback function can be set directly as a struct member. It is called in an asynchronous context whenever a packet with the specifies properties is received. In our case this means, that we only want Datagram, IPv4 packets. Because the socket is bound to a specific port, only packets arriving there are reported.
 	
 	For the control and the data socket, the same callback function is used, because the processing does not differ very much and differences can be caught, because the receiving socket is passed as an argument.
 	
@@ -135,9 +136,9 @@
 	
 	To be able to receive MIDI events, it is necessary to register the module at the sequencer core of the alsa framework. This is done in two steps. First a new virtual sound card must be allocated, which then can host a client. The client can be configured with multiple flags. As our driver should only receive commands, only the input flags are set.
 	
-	On arrival of data, the driver is notified by a callback function. There is a custom argument, so the driver management object hast not to be accessed from a global variable.
+	On arrival of data, the driver is notified by a callback function. There is a custom argument, so the driver management object has not to be accessed from a global variable.
 	
-	In the current development status, every event is converted into an internal storage format of MIDI events and handed over to the transmission chain. In a subsequent version, this might be improved. An RTPMIDI packet can transport multiple commands with individual time offsets. This can be utilized by queueing events for a short time and then send multiple at once. The tradeoff between delay and throughput has to be chosen wisely. A common user case is playing an accord which should not result in many small packets but one big.
+	In the current development status, every event is converted into an internal storage format of MIDI events and handed over to the transmission chain. In a subsequent version, this might be improved. An RTPMIDI packet can transport multiple commands with individual time offsets. This can be utilized by queueing events for a short time and then send multiple at once. The tradeoff between delay and throughput has to be chosen wisely. A common use-case is playing an accord which should not result in many small packets but one big.
 	
 	The queue of commands is then first encoded as binary format. There, an other technique, known as running status, is used to increase throughput. If multiple consecutive commands are of the same type, the type is only needed for the first one and can be omitted for the rest. For example would multiple note-ons result in one complete command the the following containing only note and velocity.
 	
