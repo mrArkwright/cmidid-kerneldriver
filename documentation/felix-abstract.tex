@@ -1,0 +1,9 @@
+The AppleMIDI driver project was forked off the cmidid driver, as it might be useful for other projects too. The alsa sequencer core was considered a good interface, as it is low level enough for performance but easily controllable. Another advantage of two separate driver is, that when synthesizing directly on the local machine, there are no network security issues.
+
+The driver acts as a one-directional bridge for MIDI events from the alsa core to network clients.
+For transport, it uses an extension of RTPMIDI (RFC 6295) which is called AppleMIDI. There, the session management is included into the RTPMIDI.
+The foundation of the code is the midikit project, from which all libc independent functions were used.
+
+In the current implementation, there are several drawbacks from an optimal bridge. It does not accumulate multiple events which are issued in a short interval. Also only a subset of all MIDI commands is implemented for binary encoding. A backward correcting journal might be added too. The ideal functionality will provide both directions, so MIDI commands will be transmitted and received.
+
+For live performances, this module has an average processing time of several hundred microseconds, which is under the threshold of recognition.
