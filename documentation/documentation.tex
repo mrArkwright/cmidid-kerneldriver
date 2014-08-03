@@ -1,19 +1,21 @@
-% documentation.tex
-%
-% Using the Alternate ACM Sig Proceedings style.
-% Get it at:
-%   http://www.acm.org/sigs/publications/proceedings-templates
-%
-
-\documentclass{sig-alternate}
+\documentclass[paper=a4,fontsize=11pt,twocolumn,pagesize,bibtotoc]{scrartcl}
 
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage[english]{babel}
 
+\usepackage[osf]{mathpazo}
+\usepackage{microtype}
 \usepackage{tikz}
-\usepackage{amssymb,amsmath}
+\usetikzlibrary{automata}
+\usepackage{amsthm, amssymb, amsmath}
 \usepackage{graphicx}
+
 \usepackage{color}
+\usepackage{xr-hyper}
+\usepackage{hyperref}
+
+\parindent0pt
 
 \usepackage{listings}
 
@@ -43,25 +45,23 @@
 \def\@copyrightspace{\relax}
 \makeatother
 
-\begin{document}
 
 \title{CMIDID Kernel Driver \& Linux AppleMIDI\\Documentation}
 \subtitle{Praktikum Linux \& C - Technische Universität München}
 
-\numberofauthors{4}
+%\numberofauthors{4}
 
 \author{
-\alignauthor
-Felix Engelmann\email{\texttt{felix.engelmann@tum.de}}
-\alignauthor
-Michael Opitz\email{\texttt{opitz@in.tum.de}}
-\alignauthor
-Andreas Ruhland\email{\texttt{ruhland@in.tum.de}}
+Felix Engelmann\\ \texttt{felix.engelmann@tum.de}
 \and
-\alignauthor
-Jannik Theiß\email{\texttt{jannik.theiß@tum.de}}
+Michael Opitz\\ \texttt{opitz@in.tum.de}
+\and
+Andreas Ruhland\\ \texttt{ruhland@in.tum.de}
+\and
+Jannik Theiß\\ \texttt{jannik.theiß@tum.de}
 }
 
+\begin{document}
 \maketitle
 
 \section{Overview}
@@ -79,7 +79,7 @@ the \emph{RPT MIDI} standard (as described in
 \href{http://tools.ietf.org/html/rfc6295}{RFC 6295}), yet after some initial 
 discussion, the decision was made to focus developement on the CMIDID driver, 
 which enabled us to build custom MIDI hardware with low-cost devices like, in 
-our case, the \href{www.raspberryp.org}{Raspberry Pi}. Later during the 
+our case, the \href{www.raspberrypi.org}{Raspberry Pi}. Later during the 
 development phase, after some promising progress on the CMIDID project, we 
 started to implement a altered version of the RTP MIDI driver in the 
 form of the \emph{AppleMIDI} driver, which supports only a subset of the 
@@ -134,14 +134,9 @@ The CMIDID driver is intended to be run on a Raspberry Pi, which comes with
 several GPIO ports for simple hardware prototyping and which is able to run 
 a Linux kernel as well as general purpose applications. In theory, every 
 devices which supports Linux and has GPIO pins can be used to replicate our 
-setup. Considering that we need to have software for audio processing, e.g.
-an Arduino board is not a reasonable choice to build CMDIDID keyboards.
-
-An introduction on the challenges of compling and running CMIDID on the 
-Raspberry Pi can be found here:
-
-LINK TO RASPBERRY PI SETUP: ANDI
-
+setup. 
+An introduction on the challenges of compiling and running CMIDID on the 
+Raspberry Pi can be found here the document \texttt{andreas.pdf}
 \subsubsection{Custom Keyboards}
 \label{cmidid:keyboards}
 
@@ -178,15 +173,13 @@ MIDI device is provided to communicate with other sound processing hardware
 like for example a software synthesize like FluidSynth 
 (\url{http://www.fluidsynth.org}) or TiMidity++ 
 (\url{http://timidity.sourceforge.net}). Fortunatley, the Linux kernel 
-offers an interface to easily add MIDI devices to the existing sound 
-infrastructure: the ALSA sequencer API. This API offers methods for MIDI 
+offers an interface to easily handle MIDI devices: the ALSA sequencer API.
+This API offers methods for MIDI 
 device creation and manipulation and can be used from the userspace to 
 route MIDI events between different devices.
 
-Check out the this section to see how we used the ALSA sequencer API for
-our this project:
-
-LINK TO MIDI DEVICE CREATION/ALSA SECTION: ANDI
+Check out the the corresponding section to see how we used the ALSA sequencer API for
+our this project: \texttt{andreas.pdf}
 
 \subsubsection{GPIO Handling}
 \label{cmidid:gpio}
@@ -206,11 +199,15 @@ LINK TO GPIO SECTION: MICHAEL
 
 \subsection{AppleMIDI}
 \label{overview:applemidi}
-
-
-
-\subsubsection{Authors}
-\label{applemidi:authors}
+The AppleMIDI driver project was forked off the cmidid driver, as it might be useful for other projects too. The alsa sequencer core was considered a good interface, as it is low level enough for performance but easily controllable. Another advantage of two separate driver is, that when synthesizing directly on the local machine, there are no network security issues.
+\\
+The driver acts as a one-directional bridge for MIDI events from the alsa core to network clients.
+For transport, it uses an extension of RTPMIDI (RFC 6295) which is called AppleMIDI. There, the session management is included into the RTPMIDI.
+The foundation of the code is the midikit project, from which all libc independent functions were used.
+\\
+In the current implementation, there are several drawbacks from an optimal bridge. It does not accumulate multiple events which are issued in a short interval. Also only a subset of all MIDI commands is implemented for binary encoding. A backward correcting journal might be added too. The ideal functionality will provide both directions, so MIDI commands will be transmitted and received.
+\\
+For live performances, this module has an average processing time of several hundred microseconds, which is under the threshold of recognition.
 
 \end{document}
 
