@@ -5,5 +5,9 @@ documentation.fls
 documentation.aux
 documentation.fdb_latexmk
 
+short.out
+short.pdf
+short.aux
+
 *.log
 
