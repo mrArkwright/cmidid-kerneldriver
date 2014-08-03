@@ -14,7 +14,7 @@
 % Customize the appearance of code listings:
 \lstset{
   backgroundcolor=\color{white},
-  basicstyle=\ttfamily,
+  basicstyle=\small\ttfamily,
   breakatwhitespace=false,
   breaklines=true,
   captionpos=b,
@@ -30,7 +30,7 @@
   showspaces=false,
   showstringspaces=false,
   showtabs=false,
-  stepnumber=2,
+  stepnumber=1,
   stringstyle=\color{mauve},
   tabsize=2,
   title=\lstname
@@ -78,7 +78,7 @@ ktime_get();
 hrtimer_start(struct hrtimer *timer, ktime_t tim, const enum hrtimer_mode mode);
 hrtimer_init(struct hrtimer *timer, clockid_t which_clock, enum hrtimer_mode mode);
 \end{lstlisting}
-and a couple more (see: \texttt{linux/include/linux/hrtimer.h}).
+and a couple more (see: \url{https://github.com/torvalds/linux/blob/master/include/linux/hrtimer.h}).
 So, we decided that we don't need a separate module 
 component to handle the timer related functionality and included this in the 
 GPIO component.
@@ -147,20 +147,76 @@ Additional to following overviews of each component, the next section provides
 a brieft introduciton of the KBuild system and how we used this to compile 
 the components into a single module.
 
-\subsection{Compilation with KBuild}
+\subsection{Compilation with Kbuild}
 \label{component:compilation}
 
-The Linux kernel uses a system named KBuild which is thoroughly described in 
+The Linux kernel uses a system named Kbuild which is thoroughly described in 
 \url{https://github.com/torvalds/linux/blob/master/Documentation/kbuild/}.
 For building external (i.e. out-of-tree) modules, the documentation file
 \url{https://github.com/torvalds/linux/blob/master/Documentation/kbuild/modules.txt}
 was especially relevant and explained the creation of makefiles for this type
 of module.
 
-
+For compiling a single out-of-tree module that consists of several components,
+one can provide the name of the module and the names of the components with
+the following syntax to Kbuild:
+\begin{lstlisting}[language=make]
+obj-m := cmidid.o
+cmidid-objs := cmidid_midi.o cmidid_main.o cmidid_gpio.o
+\end{lstlisting}
+Kbuild will derive the required source files from the given information.
+The only thing left to do is to build the actual module with
+\begin{lstlisting}[language=make]
+all:
+	$(MAKE) -C $(KSRC) M=$$PWD modules
+\end{lstlisting}
+The \texttt{-C} flag tells \texttt{make} to change in the directory containing the 
+sources for the running kernel, and the \texttt{M} option is required for the 
+location of the external module that we are compiling.
 
 \subsection{The Main Module Component}
 \label{component:main}
+
+The component \texttt{cmidid\_main.c} of the CMIDID module does the following:
+\begin{itemize}
+  \item Setting up the required module information, like the init and exit 
+    function with the \texttt{module\_init} and \texttt{module\_exit} macros.
+  \item Creation of a character device in the initialization routine. This
+    device is required for \texttt{ioctl} and it's created with the \texttt{cdev}
+    interface. First the character device needs to be created with the 
+    subsequent calls \texttt{alloc\_chrdev\_region} (gets the device number), 
+    \texttt{cdev\_alloc} (allocates space for the actual device) and
+    \texttt{cdev\_add} (adds the device to the system). Finally, for the character
+    device to appear in the sysfs filesystem, we need can create the device 
+    node from our module with \texttt{device\_create}.
+  \item Handling of the initialization routine for every other module 
+    component. There's one problem that needs to be taken care of: If the 
+    GPIO component is initialized after the MIDI component, and if the 
+    initialization of the MIDI component fails, we can't just call \texttt{exit(-1)}
+    to terminate the module. Every memory allocate in the MIDI init routine
+    needs to be freed manually, so that we can exit without memory leaks.
+    The most readable way to do this, is to call the cleanup functions in 
+    inverse order via a list of \texttt{goto} labels like this:
+\begin{lstlisting}[language=C]
+if ((err = cmidid_midi_init() < 0)
+  goto err_midi_init;
+
+if ((err = cmidid_gpio_init( ) < 0)
+  gotot err_gpio_init;
+
+err_gpio_init:
+  cmidid_midi_exit();
+
+err_midi_init:
+  free character device
+  ...
+\end{lstlisting}
+  \item The \texttt{exit} routine of the module needs to call the subcomponent
+    cleanup routines in a similar fashion to guarantee a clean exit.
+  \item Additional to the above, the main component also handles the \texttt{ioctl}
+    user input. This process is explained more detailed in Jannik's part of the 
+    documentation.
+\end{itemize}
 
 \subsection{The MIDI Module Component}
 \label{component:midi}
@@ -170,8 +226,90 @@ of module.
 
 \section{Working with GPIOs}
 \label{michael:gpios}
+In this section, the GPIO component of the CMIDID driver is described in more
+detail. The component consists for the first part of the header \texttt{cmidid\_gpio.h} which
+provides several function definitions for the main module, including the 
+init and exit routines of the GPIO component, and functions for \texttt{ioctl}
+configuration. The corresponding source file is \texttt{cmidid\_gpio.c}.
+The following subsections describe some of the more interesing parts of the 
+component. A definition of the GPIO interface of the kernel can be found in 
+the header file \url{https://github.com/torvalds/linux/blob/master/include/linux/gpio.h}.
 
+\subsection{The \texttt{key} Struct}
+\label{gpios:key}
 
+The main abstraction that is used in the GPIO component, is the \texttt{struct key}
+which describes an abstract key of a MIDI keyboard. Here's the definition:
+\begin{lstlisting}
+struct key {
+  KEY_STATE state;
+  struct gpio gpios[2];
+  unsigned int irqs[2];
+  ktime_t hit_time;
+  bool timer_started;
+  struct hrtimer hrtimers[2];
+  unsigned char note;
+  int last_velocity;
+};
+\end{lstlisting}
+Each key of our keyboard has two buttons which are required to determine the
+velocity/force of the key hit, so we need a pair of GPIO ports for every button.
+Most of the other struct members are necessary to actually calculate the 
+hit velocity for the specific key and the \texttt{note} member associates a
+MIDI note with the button.
+
+\subsection{GPIO Interrupts}
+\label{gpios:interrupts}
+Fortunately, the Raspberry Pi supported interrupts for every GPIO pin, so it
+was not necessary to write extra code to listen on each port for rising and 
+falling edge triggers. We could rather specify a callback function for every
+IRQ: \texttt{irq\_handler} in \texttt{cmidid\_gpio.c}. That's the function we
+used to calculate the actual time difference between the button hits for each
+keyboard key.
+
+\subsection{Initialization}
+\label{gpios:init}
+
+The GPIO initialization function \texttt{cmidid\_gpio\_init} takes care of of 
+several required steps to setup working GPIO ports.
+
+\begin{itemize}
+  \item The number of required GPIOs is determined via the \texttt{gpio\_mapping}
+    module parameter.
+  \item It's necessary to request the GPIO port numbers which need to used.
+    The most readable way to do this, is to define an array of \texttt{gpio}
+    structs and call the function \texttt{gpio\_request\_array}. (In the case
+    of an error those need to be freed with \texttt{gpio\_free\_array}.)
+  \item The high resolution timers, which are required for the time 
+    measurement, need to be initialized and the callback functions for each
+    timer is set to \texttt{timer\_irq}.
+  \item The IRQs must be requested, so that the \texttt{irq\_handler} can be 
+    called on an interrupt. This is achieved by getting an IRQ number for 
+    every GPIO with the \texttt{gpio\_to\_irq} routine. (That part is 
+    architecture specific and not necessarly available on every ARM system.
+    Fortunatley, it's available on the Raspberry Pi.) After getting the IRQ
+    number, \texttt{request\_irq} needs to be called, finally.
+\end{itemize}
+
+\subsection{The IRQ Handler}
+\label{gpios:irqhandler}
+
+After successfully initializing the GPIOs and IRQs, the only thing necessary 
+to define is the interrupt callback function \texttt{irq\_handler}. The function
+signature is:
+\begin{lstlisting}
+  irqreturn_t irq_handler(int irq, void *dev_id);
+\end{lstlisting}
+So, with our setup, the each key struct is associated with two irq numbers, 
+one for the first and one for the second button. We can set the touch and the 
+hit time time for each key when the handler is called with one of the associated IRQ
+numbers. 
+
+One important consideration here is, that we need to take care of possible 
+button jittering manually. We solved this problem by calling another callback
+function which is delay with a high resolution timer. Until this second 
+callback function is executed, we ignore every subsequent input on the 
+current GPIO port, which seems to be a simple, yet reliable jitter resolution.
 
 \end{document}
 

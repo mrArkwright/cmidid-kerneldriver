@@ -15,7 +15,7 @@ all: documentation.pdf
 # you might have.
 
 %.tex: %.raw
-#	./raw2tex $< > $@
+	./raw2tex $< > $@
 
 %.tex: %.dat
 	./dat2tex $< > $@
