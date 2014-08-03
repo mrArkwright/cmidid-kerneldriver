@@ -111,8 +111,7 @@ MIDI hardware compared to other projects with a similar scope (like, e.g. the
 \label{cmidid:authors}
 
 CMIDID was written by Michael Opitz, Andreas Ruhland and Jannik Theiß in 
-collaboration. TODO: ADD SHORT OVERVIEW HOW WE DISTRIBUTED THE WORKLOAD.
-I CAN'T REMEMBER EXACTLY...
+collaboration.
 
 \subsubsection{Module Structure}
 \label{cmidid:structure}
@@ -123,9 +122,8 @@ components: The main component, the GPIO component and the MIDI component.
 The main component handles mostly the setup and cleanup of the other 
 components as well IOCTL. The MIDI component handles the creation and control 
 of the corresponding virtual MIDI device and the GPIO component translates 
-GPIO input into MIDI events.
-
-LINK TO INDEPTH DISCUSSION OF MODULE STRUCTURE: MICHAEL
+GPIO input into MIDI events. For a indepth documentation on this topic, take 
+a look at \texttt{michael.pdf}.
 
 \subsubsection{Hardware}
 \label{cmidid:hardware}
@@ -145,9 +143,7 @@ GPIO ports as key hits and key releases. This allows flexibility for the
 construction of custom hardware, but has the downside of increased hardware 
 prototyping time and more involved driver configuration.
 
-An overview of our sample keyboard setup on a breadboard can be found here:
-
-LINK TO KEY CONSTRUCTION: JANNIK
+An overview of our sample keyboard setup on a breadboard can be found in \texttt{jannik.pdf}
 
 \subsubsection{Module Configuration}
 \label{cmidid:configuration}
@@ -161,9 +157,7 @@ be configured during runtime via IOCTL from the userspace, which can be used
 for example to transpose the MIDI notes, i.e. add a constant to every note 
 event.
 
-The available configuration options are listed in:
-
-LINK TO CMIDID CONFIGURATION: JANNIK
+The available configuration options are listed in \texttt{jannik.pdf}.
 
 \subsubsection{Virtual MIDI device}
 \label{cmidid:midi}
@@ -193,12 +187,17 @@ the noteon events. This is done by measuring the time difference between
 the virtual key hits and interpolating the velocity according to a given 
 interpolation function.
 
-For more details on the handling of GPIO input, see:
-
-LINK TO GPIO SECTION: MICHAEL
+For more details on the handling of GPIO input, see \texttt{michael.pdf}.
 
 \subsection{AppleMIDI}
 \label{overview:applemidi}
+
+\subsubsection{Author}
+
+The AppleMIDI kernel driver was exclusivley developed by Felix Engelmann.
+
+\subsubsection{Information}
+
 The AppleMIDI driver project was forked off the cmidid driver, as it might be useful for other projects too. The alsa sequencer core was considered a good interface, as it is low level enough for performance but easily controllable. Another advantage of two separate driver is, that when synthesizing directly on the local machine, there are no network security issues.
 \\
 The driver acts as a one-directional bridge for MIDI events from the alsa core to network clients.
