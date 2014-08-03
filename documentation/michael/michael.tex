@@ -1,0 +1,177 @@
+\documentclass[paper=a4,fontsize=11pt,twocolumn,pagesize,bibtotoc]{scrartcl}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+\usepackage{tikz}
+\usepackage{amssymb,amsmath}
+\usepackage{graphicx}
+\usepackage{color}
+
+\usepackage{listings}
+
+% Customize the appearance of code listings:
+\lstset{
+  backgroundcolor=\color{white},
+  basicstyle=\ttfamily,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{green},
+  frame=single,
+  keepspaces=true,
+  keywordstyle=\color{blue},
+  language=C,
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{gray},
+  rulecolor=\color{black},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  stepnumber=2,
+  stringstyle=\color{mauve},
+  tabsize=2,
+  title=\lstname
+}
+
+\usepackage{hyperref}
+
+% Customize the appearance of hyperlinks and of the pdf reader:
+\hypersetup{
+  colorlinks=true, % removes border, allows text coloring
+  linkcolor=blue, % color of in-document links.
+  urlcolor=blue, % color for weblinks/email
+  pdfborderstyle={/S/U/W 1} % 1pt underline (instead of a box)
+}
+
+% Remove the annoying ACM copyright notice:
+\makeatletter
+\def\@copyrightspace{\relax}
+\makeatother
+
+\title{CMIDID Kernel Driver\\Module Setup and GPIO Input}
+\subtitle{Praktikum Linux \& C - Technische Universität München}
+
+\author{Michael Opitz}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+\label{michael:introduction}
+
+In this part of the documentation, the setup of the CMIDID driver and the 
+distribution into several components will be explained, as well as the 
+implementation of the GPIO component, which is the one that handles the input 
+on GPIO ports and translates that input into MIDI events.
+I spent most of my time during the 
+development phase working on the latter component, but before we actually 
+started to implement the driver, I looked into the high-resolution timer API 
+of the kernel. That was because we knew from the beginning that measuring the 
+time difference between consecutive key hits (of our breadboard MIDI keyboard) 
+would be required. Fortunately, the hrtimer API turned out to be very 
+userfriendly and in the end we only required some simple functions like 
+\begin{lstlisting}
+ktime_get();
+hrtimer_start(struct hrtimer *timer, ktime_t tim, const enum hrtimer_mode mode);
+hrtimer_init(struct hrtimer *timer, clockid_t which_clock, enum hrtimer_mode mode);
+\end{lstlisting}
+and a couple more (see: \texttt{linux/include/linux/hrtimer.h}).
+So, we decided that we don't need a separate module 
+component to handle the timer related functionality and included this in the 
+GPIO component.
+
+So, besides the timer component, which was not required, and the GPIO 
+component I already mentioned, we did add a main component, which handles 
+initialization of the other components, as well as a MIDI component, which is 
+responsible for creating a virtual MIDI device, and for outputting MIDI 
+events on that device.
+
+In the section \textbf{\nameref{michael:setup}}, I'm going to show how the compilation of 
+the several module components works and how the component initialization and 
+exit routines have to be handled. The other part of his documentation is 
+a detailed explanation of the GPIO component: \textbf{\nameref{michael:gpios}}. This 
+includes the steps necessary to read input on the GPIO ports from the kernel 
+module, a description of a clean exit routine, as well as a couple of special 
+cases and workaround for bugs, that are worth mentioning. The GPIO component 
+has a significant amount of code for handling module customization via 
+\texttt{ioctl} and module parameters; this won't be explained in this part of 
+the documentation, but rather in (TODO: CITE JANNIK). And for an indepth guide 
+on the MIDI component, take a look at (TODO: CITE ANDI).
+
+\section{Project Setup}
+\label{michael:setup}
+
+The CMIDID kernel driver found in the \texttt{module} subdirectory, is split
+up into the following components. The following enumeration and the following
+subsections contain a short overview for each of those components as well as 
+short explanation of our decision as to why we needed/created those components.
+\begin{itemize}
+  \item The main component: \texttt{cmidid\_main.c}. That's the one that 
+    handles the actual module initialization and the module cleanup, aw well 
+    as the creation of a character device for \texttt{ioctl}, and the 
+    \texttt{ioctl} callback function. See section \textbf{\nameref{component:main}}.
+  \item The MIDI component: \texttt{cmidid\_midi.c}. This component handles 
+    the creation of the virtual MIDI soundcard via the ALSA sequencer 
+    interface, and the sending of MIDI events (in our case only the events 
+    \texttt{noteon} and \texttt{noteoff}). See section \textbf{\nameref{component:midi}}.
+  \item The GPIO component: \texttt{cmidid\_gpio.c}. This component is 
+    responsible for reading input on the GPIO ports, for translating the 
+    input into MIDI keyboard key hit events and for informing the MIDI 
+    component to actually send a MIDI event. See section \textbf{\nameref{component:gpio}}.
+\end{itemize}
+In-tree modules are usually contained in a signle \texttt{.c} file, but we 
+used this setup to make a clean seperation of the individual logical parts of 
+the module and to increase readability of each single source file. We added 
+a header for every single component, where the \texttt{cmidid\_ioctl.h} header 
+is special, in the way that it needs to be included by userspace programs that
+want to communicate with the module via \texttt{ioctl}. And the \texttt{cmidid\_util.h}
+header contains only a couple of \texttt{printk} macros to ease the output of 
+debug information into the kernel log. The final structure of our project 
+setup looks like this:
+\begin{lstlisting}
+module/
+  Makefile
+  cmidid_main.h
+  cmiddi_main.c
+  cmidid_gpio.h
+  cmidid_gpio.c
+  cmidid_midi.h
+  cmidid_midi.c
+  cmidid_ioctl.h
+  cmidid_util.h
+\end{lstlisting}
+Additional to following overviews of each component, the next section provides
+a brieft introduciton of the KBuild system and how we used this to compile 
+the components into a single module.
+
+\subsection{Compilation with KBuild}
+\label{component:compilation}
+
+The Linux kernel uses a system named KBuild which is thoroughly described in 
+\url{https://github.com/torvalds/linux/blob/master/Documentation/kbuild/}.
+For building external (i.e. out-of-tree) modules, the documentation file
+\url{https://github.com/torvalds/linux/blob/master/Documentation/kbuild/modules.txt}
+was especially relevant and explained the creation of makefiles for this type
+of module.
+
+
+
+\subsection{The Main Module Component}
+\label{component:main}
+
+\subsection{The MIDI Module Component}
+\label{component:midi}
+
+\subsection{The GPIO Component}
+\label{component:gpio}
+
+\section{Working with GPIOs}
+\label{michael:gpios}
+
+
+
+\end{document}
+
