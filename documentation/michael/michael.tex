@@ -116,7 +116,7 @@ short explanation of our decision as to why we needed/created those components.
   \item The MIDI component: \texttt{cmidid\_midi.c}. This component handles 
     the creation of the virtual MIDI soundcard via the ALSA sequencer 
     interface, and the sending of MIDI events (in our case only the events 
-    \texttt{noteon} and \texttt{noteoff}). See section \textbf{\nameref{component:midi}}.
+    \texttt{noteon} and \texttt{noteoff}). This is component is explained in Andreas' part of the documentation.
   \item The GPIO component: \texttt{cmidid\_gpio.c}. This component is 
     responsible for reading input on the GPIO ports, for translating the 
     input into MIDI keyboard key hit events and for informing the MIDI 
@@ -218,8 +218,6 @@ err_midi_init:
     documentation.
 \end{itemize}
 
-\subsection{The MIDI Module Component}
-\label{component:midi}
 
 \subsection{The GPIO Component}
 \label{component:gpio}
@@ -310,6 +308,20 @@ button jittering manually. We solved this problem by calling another callback
 function which is delay with a high resolution timer. Until this second 
 callback function is executed, we ignore every subsequent input on the 
 current GPIO port, which seems to be a simple, yet reliable jitter resolution.
+
+\subsection{Button Events}
+\label{gpios:buttonevents}
+
+After the timer callback function is called, the value on the corresponding 
+GPIO port is read (which is in our case an integer, usually just 0 or 1).
+We can calculate the velocity from the saved timestamps for each button.
+This is done by calling the function \texttt{time\_to\_velocity} which
+interpolates the key hit velocity from a given interpolation function, and from
+given values for the minimum and maximum time difference. The interpolation function 
+and the time thresholds can be set via \texttt{ioctl}.
+After calculating the velocity value, the \texttt{handle\_button\_event}
+routine is called, which sends an appropriate MIDI event, depending on the 
+current value on the GPIO port and the calculated velocity.
 
 \end{document}
 
